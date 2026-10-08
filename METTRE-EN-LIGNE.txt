@@ -1,0 +1,107 @@
+METHODE RAPIDE (automatique)
+============================
+1. Dezippez le dossier. Ouvrez-le dans l'Explorateur Windows.
+2. Cliquez dans la barre d'adresse en haut, tapez  cmd  puis Entree (une fenetre noire s'ouvre dans le dossier).
+3. Tapez  MISE-EN-LIGNE.bat  puis Entree, et suivez les questions :
+   - connexion a GitHub (le navigateur s'ouvre, vous validez un code) ;
+   - vous collez 2 informations de Supabase (adresse du projet + cle secrete) ;
+   - vous collez 1 cle de Render (compte gratuit, Account Settings > API Keys).
+   Le script envoie le programme sur GitHub, verifie Supabase, cree le serveur sur Render, attend la mise
+   en ligne et vous donne l'adresse de votre application.
+Si une etape bloque, la methode manuelle ci-dessous fait la meme chose a la main.
+Note : le depot GitHub est cree en "public" pour que Render puisse le lire sans autre manipulation.
+Il contient seulement le programme : jamais vos donnees ni vos cles (elles restent dans Supabase et Render).
+Pour une mise a jour plus tard : recopiez les nouveaux fichiers puis relancez MISE-EN-LIGNE.bat.
+
+-------------------------------------------------------------------------------------
+METHODE MANUELLE (secours)
+-------------------------------------------------------------------------------------
+
+METTRE BOUTIQUE EN LIGNE (GRATUIT) - pour travailler depuis PC, tablette et telephone
+=====================================================================================
+
+Le principe, en deux phrases : l'application tourne sur un petit serveur gratuit (Render).
+Chaque modification est copiee automatiquement dans votre Supabase ; si le serveur redemarre,
+il retrouve tout. Vous ouvrez simplement une adresse internet sur n'importe quel appareil.
+
+Il y a 3 comptes gratuits : GitHub (le coffre du programme), Supabase (vos donnees, vous l'avez deja),
+Render (le serveur). Comptez 20 a 30 minutes, une seule fois.
+
+
+PARTIE A - GITHUB (le coffre du programme)
+------------------------------------------
+1. Allez sur https://github.com et cliquez sur "Sign up". Creez un compte (email, mot de passe, nom).
+   Confirmez votre email avec le code recu.
+2. Une fois connecte, cliquez sur le "+" en haut a droite, puis "New repository".
+3. Repository name : boutique
+   Cochez "Private" (prive : personne d'autre ne le voit).
+   Cliquez sur "Create repository".
+4. Sur la page qui s'ouvre, cliquez sur le lien "uploading an existing file".
+5. Ouvrez le dossier de Boutique sur votre PC (celui qui contient package.json, server, client...).
+   Selectionnez TOUT son contenu (Ctrl+A) SAUF les dossiers "node_modules" et "data" s'ils existent,
+   puis glissez-deposez la selection dans la page GitHub. Attendez la fin du chargement.
+6. En bas, cliquez sur le bouton vert "Commit changes".
+
+
+PARTIE B - SUPABASE (vos donnees)
+---------------------------------
+Vous pouvez utiliser un projet Supabase que vous avez deja : Boutique n'y touche pas a vos tables,
+il y cree seulement un espace de fichiers prive nomme "boutique-data".
+(Si vous n'avez aucun projet : "New project", donnez un nom et un mot de passe, choisissez la region
+la plus proche, offre gratuite.)
+1. Allez sur https://supabase.com/dashboard et ouvrez votre projet.
+2. Cliquez sur l'engrenage "Project Settings" (en bas a gauche), puis "API" (ou "API Keys").
+3. Notez deux choses (copiez-les dans un fichier Bloc-notes pour l'instant) :
+   - "Project URL" : ressemble a https://abcdefgh.supabase.co
+   - la cle secrete : "service_role" (cliquez sur "Reveal" pour l'afficher) ;
+     ou, sur les ecrans recents, la cle "secret" qui commence par sb_secret_
+   ATTENTION : cette cle est comme un mot de passe maitre. Ne la donnez a personne,
+   ne la collez nulle part sauf dans Render (partie C).
+
+
+PARTIE C - RENDER (le serveur)
+------------------------------
+1. Allez sur https://render.com et cliquez sur "Get Started". Choisissez "GitHub" pour vous inscrire
+   (autorisez l'acces au depot "boutique" quand c'est demande).
+2. Cliquez sur "New +" (en haut) puis "Blueprint".
+3. Choisissez le depot "boutique" et cliquez sur "Connect".
+4. Render lit le fichier du projet et affiche deux cases a remplir :
+   - SUPABASE_URL          -> collez le "Project URL"
+   - SUPABASE_SERVICE_KEY  -> collez la cle secrete
+5. Cliquez sur "Apply" (ou "Deploy Blueprint"). Patientez 5 a 10 minutes la premiere fois.
+   Quand c'est fini, l'etat devient "Live" et une adresse apparait en haut du service,
+   du type  https://boutique-xxxx.onrender.com
+   (Si Render vous demande une carte bancaire pour l'offre gratuite, arretez-vous et dites-le-moi.)
+
+
+PARTIE D - PREMIERE UTILISATION
+-------------------------------
+1. Ouvrez l'adresse Render dans le navigateur (PC, tablette ou telephone).
+   La premiere fois, patientez jusqu'a une minute.
+2. L'ecran "Bienvenue" apparait : creez votre compte proprietaire (nom du commerce, votre nom,
+   code PIN). Prenez de preference 6 chiffres ou plus, car l'application est maintenant sur internet.
+3. Allez dans l'onglet "Sauvegardes" : une carte "Copie en ligne (Supabase)" doit afficher
+   "Tout est a jour". C'est la preuve que vos donnees sont copiees. Si elle affiche une erreur
+   en rouge, envoyez-moi le texte exact, je corrige.
+4. Sur telephone/tablette : ouvrez l'adresse dans Chrome (Android) ou Safari (iPhone), puis
+   menu "Ajouter a l'ecran d'accueil". Vous avez une icone comme une vraie application.
+5. Creez ensuite les comptes de vos collaborateurs (onglet "Comptes") : chacun a son PIN.
+
+
+A SAVOIR (franchement)
+----------------------
+- Reveil : sans visite pendant 15 minutes, le serveur gratuit s'endort. La premiere personne qui ouvre
+  l'application le matin attend environ 1 minute, puis tout est rapide. Pour l'eviter, un service de
+  "ping" gratuit (par exemple cron-job.org) peut visiter l'adresse  .../api/public  toutes les 5 minutes.
+  Je vous guiderai si vous le souhaitez.
+- Supabase gratuit met un projet en pause apres 1 semaine sans aucune activite. Si le commerce ferme plus
+  d'une semaine, ouvrez le tableau de bord Supabase et cliquez sur "Restore project" : vos donnees sont
+  conservees. Tant que l'application est utilisee, il n'y a pas de pause.
+- Les sauvegardes quotidiennes sur le serveur disparaissent a chaque redemarrage ; ce sont les copies
+  Supabase (une par jour gardee 30 jours + les 20 dernieres) qui vous protegent. Telechargez tout de meme
+  une sauvegarde par semaine depuis l'onglet "Sauvegardes" et gardez-la ailleurs.
+- Pas de connexion internet = pas de travail, jusqu'a l'etape 5 (caisse hors-ligne).
+- Mises a jour : je vous enverrai un nouveau dossier. Sur GitHub, ouvrez le depot, cliquez
+  "Add file" > "Upload files", glissez les fichiers, "Commit changes" : Render se met a jour tout seul
+  en quelques minutes, sans toucher a vos donnees.
+- Si les prix ou limites des services gratuits changent, c'est a verifier sur leurs sites.

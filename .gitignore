@@ -1,0 +1,5 @@
+node_modules/
+data/
+*.log
+.mise-en-ligne.json
+ADRESSE-BOUTIQUE.txt
