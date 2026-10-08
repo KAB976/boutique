@@ -101,7 +101,7 @@ async function main() {
   try {
     result = await deployToRender({
       apiKey, repoUrl,
-      env: { NODE_VERSION: '22.12.0', TRUST_PROXY: '1', SUPABASE_URL: sbCfg.url, SUPABASE_SERVICE_KEY: sbCfg.key },
+      env: { NODE_VERSION: '22.22.0', TRUST_PROXY: '1', SUPABASE_URL: sbCfg.url, SUPABASE_SERVICE_KEY: sbCfg.key },
       log: say,
     });
   } catch (e) { stop(`${e.message}\n  (Si Render demande une carte bancaire ou refuse l'offre gratuite, dites-le-moi.)`); }

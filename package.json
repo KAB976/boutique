@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Gestion snack / traiteur : caisse, stock, recettes, production (PWA)",
-  "engines": { "node": ">=22.5" },
+  "engines": { "node": ">=22.13" },
   "scripts": {
     "build": "vite build",
     "start": "node --disable-warning=ExperimentalWarning server/index.js",

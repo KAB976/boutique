@@ -25,8 +25,14 @@ export async function deployToRender({ apiKey, repoUrl, env, name = 'boutique', 
 
   const existing = ((await call('GET', `/services?name=${encodeURIComponent(name)}&ownerId=${owner.id}&limit=20`)) || []).map((s) => s.service || s).find((s) => s?.name === name);
   let service = existing;
+  let deployId = null;
   if (existing) {
-    log(`Le service « ${name} » existe déjà sur Render : je le réutilise.`);
+    log(`Le service « ${name} » existe déjà sur Render : je le réutilise et je mets ses réglages à jour.`);
+    if (!existing.id) throw new Error('Render n\'a pas renvoyé d\'identifiant de service.');
+    // Remplace toutes les variables (version de Node, clés Supabase…) puis relance un déploiement propre.
+    await call('PUT', `/services/${existing.id}/env-vars`, Object.entries(env).map(([key, value]) => ({ key, value })));
+    const d = await call('POST', `/services/${existing.id}/deploys`, { clearCache: 'clear' });
+    deployId = (d?.deploy || d)?.id || null;
   } else {
     log('Création du service sur Render…');
     const created = await call('POST', '/services', {
@@ -38,6 +44,7 @@ export async function deployToRender({ apiKey, repoUrl, env, name = 'boutique', 
       },
     });
     service = created.service || created;
+    deployId = created.deployId || null;
   }
   if (!service?.id) throw new Error('Render n\'a pas renvoyé d\'identifiant de service.');
 
@@ -45,8 +52,10 @@ export async function deployToRender({ apiKey, repoUrl, env, name = 'boutique', 
   const started = Date.now();
   let last = '';
   while (Date.now() - started < maxWaitMs) {
-    const deploys = (await call('GET', `/services/${service.id}/deploys?limit=1`)) || [];
-    const d = deploys[0]?.deploy || deploys[0];
+    let d;
+    if (deployId) d = await call('GET', `/services/${service.id}/deploys/${deployId}`);
+    else { const deploys = (await call('GET', `/services/${service.id}/deploys?limit=1`)) || []; d = deploys[0]?.deploy || deploys[0]; }
+    d = d?.deploy || d;
     const st = d?.status || 'en attente';
     if (st !== last) { log(`  état du déploiement : ${st}`); last = st; }
     if (st === 'live') return { url: url || (await call('GET', `/services/${service.id}`))?.serviceDetails?.url, serviceId: service.id };

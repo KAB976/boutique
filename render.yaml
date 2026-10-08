@@ -10,7 +10,7 @@ services:
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: 22.12.0
+        value: 22.22.0
       - key: TRUST_PROXY
         value: "1"
       - key: SUPABASE_URL

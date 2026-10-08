@@ -27,7 +27,7 @@ Vos comptes, réglages et sauvegardes sont conservés ; la base est mise à nive
 
 ## Démarrer
 
-Il faut Node.js 22.5 ou plus récent.
+Il faut Node.js 22.13 ou plus récent.
 
 ```
 npm install --omit=dev

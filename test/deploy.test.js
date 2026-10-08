@@ -19,10 +19,12 @@ async function fakeRender({ existing = false, failBuild = false, never = false }
         services.push({ service: { id: 'srv-1', name: body.name, serviceDetails: { url: 'https://boutique-abc.onrender.com' } } });
         return send(201, { service: services.at(-1).service, deployId: 'dep-1' });
       }
+      if (req.method === 'PUT' && req.url === '/services/srv-1/env-vars') return send(200, body);
+      if (req.method === 'POST' && req.url === '/services/srv-1/deploys') return send(201, { id: 'dep-2', status: 'created' });
       if (req.method === 'GET' && req.url.startsWith('/services/srv-1/deploys')) {
         polls += 1;
         const status = never ? 'build_in_progress' : failBuild ? (polls > 1 ? 'build_failed' : 'build_in_progress') : polls > 2 ? 'live' : 'build_in_progress';
-        return send(200, [{ deploy: { id: 'dep-1', status } }]);
+        return req.url.includes('/deploys/') ? send(200, { id: req.url.split('/').pop(), status }) : send(200, [{ deploy: { id: 'dep-1', status } }]);
       }
       return send(404, { message: 'inconnu' });
     });
@@ -52,8 +54,13 @@ test('Render : création du service avec les bons réglages, puis attente de « 
 test('Render : service déjà présent = réutilisé, jamais créé deux fois', async () => {
   const fr = await fakeRender({ existing: true });
   try {
-    await deployToRender(opts(fr));
-    assert.equal(fr.calls.filter((c) => c.method === 'POST').length, 0);
+    await deployToRender(opts(fr, { env: { NODE_VERSION: '22.22.0', SUPABASE_URL: 'u', SUPABASE_SERVICE_KEY: 'k' } }));
+    assert.equal(fr.calls.filter((c) => c.method === 'POST' && c.url === '/services').length, 0);
+    // réglages remplacés (version de Node corrigée) puis nouveau déploiement, suivi par son identifiant
+    const put = fr.calls.find((c) => c.method === 'PUT');
+    assert.ok(put.body.some((e) => e.key === 'NODE_VERSION' && e.value === '22.22.0'));
+    assert.ok(fr.calls.some((c) => c.method === 'POST' && c.url === '/services/srv-1/deploys'));
+    assert.ok(fr.calls.some((c) => c.url === '/services/srv-1/deploys/dep-2'));
   } finally { await fr.close(); }
 });
 
