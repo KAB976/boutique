@@ -160,3 +160,6 @@ export const SUGGESTIONS = [
   { match: /\boeufs?\b|\bœufs?\b/i, family: 'count', pieceG: 60, note: '1 œuf ≈ 60 g' },
 ];
 export const suggestFor = (name) => SUGGESTIONS.find((s) => s.match.test(name)) || null;
+
+/** Clé de comparaison de noms : sans accents ni majuscules (« Crêpes » = « CREPES »). SQLite lower() ne gère que l'ASCII. */
+export const nameKey = (s) => String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();

@@ -1,4 +1,4 @@
-import { toBase, baseOfPack, breakdown, round6, packsProblem, unitOptions, fmtBase, FAMILIES, BASE, METRIC } from '../shared/units.js';
+import { toBase, baseOfPack, breakdown, round6, packsProblem, unitOptions, fmtBase, FAMILIES, BASE, METRIC, nameKey } from '../shared/units.js';
 import { tx } from './db.js';
 import { bad, conflict, notFound, forbidden } from './errors.js';
 import { writeAudit } from './audit.js';
@@ -422,10 +422,12 @@ function writeIngredientParts(db, id, v) {
   for (const [unit, q] of v.equivs) db.prepare('INSERT INTO ingredient_equivs (ingredient_id, unit, base_qty) VALUES (?,?,?)').run(id, unit, q);
 }
 
+const ingredientNameTaken = (db, name, exceptId = 0) => db.prepare('SELECT name FROM ingredients WHERE active = 1 AND id <> ?').all(exceptId).some((r) => nameKey(r.name) === nameKey(name));
+
 export function createIngredient(db, ts, actor, body) {
   return tx(db, () => {
     const v = cleanIngredientInput(db, body, null);
-    if (db.prepare('SELECT 1 FROM ingredients WHERE active = 1 AND lower(name) = lower(?)').get(v.name)) throw conflict('Un ingrédient actif porte déjà ce nom.', 'name_taken');
+    if (ingredientNameTaken(db, v.name)) throw conflict('Un ingrédient actif porte déjà ce nom.', 'name_taken');
     const r = db.prepare(`INSERT INTO ingredients (name, category, family, yield_pct, density, piece_g, threshold, purchase_depth, storage, notes, created_at, updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(v.name, v.category, v.family, v.yieldPct, v.density, v.pieceG, v.threshold, v.purchaseDepth, v.storage, v.notes, ts, ts);
     const id = Number(r.lastInsertRowid);
@@ -449,7 +451,7 @@ export function updateIngredient(db, ts, actor, id, body) {
     if (cur.active && !active && Math.abs(st.stock) > EPS) {
       throw conflict(`Le stock n'est pas vide (${fmtBase(st.stock, cur.family)}) : déclarez une perte ou faites un inventaire à zéro avant d'archiver.`, 'stock_not_empty');
     }
-    if (active && db.prepare('SELECT 1 FROM ingredients WHERE active = 1 AND lower(name) = lower(?) AND id <> ?').get(v.name, id)) throw conflict('Un ingrédient actif porte déjà ce nom.', 'name_taken');
+    if (active && ingredientNameTaken(db, v.name, id)) throw conflict('Un ingrédient actif porte déjà ce nom.', 'name_taken');
     db.prepare(`UPDATE ingredients SET name=?, category=?, family=?, yield_pct=?, density=?, piece_g=?, threshold=?, purchase_depth=?, storage=?, notes=?, active=?, updated_at=? WHERE id=?`)
       .run(v.name, v.category, v.family, v.yieldPct, v.density, v.pieceG, v.threshold, v.purchaseDepth, v.storage, v.notes, active ? 1 : 0, ts, id);
     writeIngredientParts(db, id, v);

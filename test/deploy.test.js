@@ -19,6 +19,7 @@ async function fakeRender({ existing = false, failBuild = false, never = false }
         services.push({ service: { id: 'srv-1', name: body.name, serviceDetails: { url: 'https://boutique-abc.onrender.com' } } });
         return send(201, { service: services.at(-1).service, deployId: 'dep-1' });
       }
+      if (req.method === 'GET' && req.url === '/services/srv-1') return send(200, { id: 'srv-1', name: 'boutique', serviceDetails: { url: 'https://boutique-abc.onrender.com' } });
       if (req.method === 'PUT' && req.url === '/services/srv-1/env-vars') return send(200, body);
       if (req.method === 'POST' && req.url === '/services/srv-1/deploys') return send(201, { id: 'dep-2', status: 'created' });
       if (req.method === 'GET' && req.url.startsWith('/services/srv-1/deploys')) {
@@ -77,4 +78,25 @@ test('Render : mauvaise clé, build en échec, attente trop longue = messages cl
   try {
     await assert.rejects(() => deployToRender(opts(fr, { maxWaitMs: 50, sleep: () => new Promise((r) => setTimeout(r, 20)) })), /plus de 20 minutes/);
   } finally { await fr.close(); }
+});
+
+test('Render : mise à jour = redéploiement sans toucher aux variables, puis vérification de la version en ligne', async () => {
+  const { redeployRender } = await import('../scripts/render-deploy.mjs');
+  const fr = await fakeRender({ existing: true });
+  const live = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'application/json' }); r.end(JSON.stringify({ version: liveVersion })); });
+  let liveVersion = '0.9.0';
+  await new Promise((r) => live.listen(0, '127.0.0.1', r));
+  const liveUrl = `http://127.0.0.1:${live.address().port}`;
+  try {
+    // le faux Render renvoie l'adresse du faux site
+    const fetchFn = (u, o) => fetch(u.replace('https://boutique-abc.onrender.com', liveUrl), o);
+    const base = { apiKey: 'rnd_ok', serviceId: 'srv-1', base: fr.base, sleep: async () => {}, log: () => {}, fetchFn };
+    await assert.rejects(redeployRender({ ...base, expectVersion: '1.0.0' }), /0\.9\.0/); // ancienne version encore affichée
+    liveVersion = '1.0.0';
+    const r = await redeployRender({ ...base, expectVersion: '1.0.0' });
+    assert.equal(r.version, '1.0.0');
+    assert.ok(!fr.calls.some((c) => c.method === 'PUT'), 'les variables ne sont pas touchées');
+    assert.ok(fr.calls.some((c) => c.method === 'POST' && c.url === '/services/srv-1/deploys'));
+    await assert.rejects(redeployRender({ ...base, apiKey: 'mauvaise', expectVersion: '1.0.0' }), /401/);
+  } finally { await fr.close(); live.closeAllConnections?.(); live.close(); }
 });

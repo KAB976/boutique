@@ -8,6 +8,10 @@ import { hashPin, verifyPin, pinProblem, burnTime, newToken, sha256 } from './se
 import { can, permissionsOf, ROLES, ROLE_LABELS } from './permissions.js';
 import { writeAudit, verifyAudit, listAudit } from './audit.js';
 import { registerStock } from './stock-routes.js';
+import { registerRecipes } from './recipes-routes.js';
+import { registerPos } from './pos-routes.js';
+import { registerOrders } from './orders-routes.js';
+import { createRequire } from 'node:module';
 import { settingsFor, settingsMeta, updateSettings, getSetting } from './settings.js';
 import {
   createBackup, reserveName, listBackups, backupPath, verifyBackupFile, prune, dayIn, parseName, safeName, KIND_LABELS,
@@ -16,6 +20,9 @@ import {
 export const LOCK_AFTER = 5;
 export const LOCK_SECONDS = 60;
 const MAX_NAME = 40;
+
+const APP_VERSION = createRequire(import.meta.url)('../package.json').version;
+export const VERSION = APP_VERSION;
 
 export function createApp({ dataDir, now = () => new Date(), staticDir = null, cloud = null } = {}) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -162,7 +169,7 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
 
   api.get('/public', (req, res) => {
     const s = settingsFor(ctx.db, 'cook');
-    res.json({ shop_name: s.shop_name, logo: s.logo });
+    res.json({ shop_name: s.shop_name, logo: s.logo, timezone: s.timezone, version: APP_VERSION });
   });
 
   api.post('/auth/login', ipLimiter(60, 60_000), (req, res) => {
@@ -224,11 +231,17 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
     res.json({ ok: true });
   });
 
-  // squelettes d'accès : le contenu arrive aux étapes suivantes, la règle de droit est déjà en place
-  api.get('/costs', auth, need('costs.view'), (req, res) => res.json({ items: [], note: 'Étape 4' }));
 
   // ---------- ingrédients et stock (étape 2) ----------
   registerStock({ api, ctx, auth, need, iso, actorOf });
+
+  // ---------- recettes (étape 3) ----------
+  registerRecipes({ api, ctx, auth, need, iso, actorOf });
+
+  // ---------- produits, production, caisse, clients, fournisseurs, traiteur, gestion (étapes 4 à 9) ----------
+  registerPos({ api, ctx, auth, need, iso, actorOf });
+  // ---------- commandes envoyées à la cuisine et notifications (version 1.1) ----------
+  registerOrders({ api, ctx, auth, need, actorOf });
 
   // ---------- réglages ----------
   api.get('/settings', auth, (req, res) => {

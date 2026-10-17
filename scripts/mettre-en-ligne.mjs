@@ -8,10 +8,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { CloudSync, cloudConfig } from '../server/cloud.js';
-import { deployToRender } from './render-deploy.mjs';
+import { deployToRender, redeployRender } from './render-deploy.mjs';
+
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(root);
+const VERSION = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const MARK = path.join(root, '.mise-en-ligne.json');
 const say = (...a) => console.log(...a);
 const title = (t) => say(`\n=== ${t} ===`);
@@ -73,7 +75,15 @@ async function main() {
   // ---------- mise à jour d'une installation existante ----------
   if (fs.existsSync(MARK)) {
     const m = JSON.parse(fs.readFileSync(MARK, 'utf8'));
-    say(`\n✓ Mise à jour envoyée. Render la prend automatiquement en compte dans quelques minutes.\n  Votre adresse : ${m.url}`);
+    title('Mise à jour sur Render');
+    say('Pour lancer la mise à jour, il faut votre clé API Render (Render > votre nom > Account Settings > API Keys).');
+    say('Collez-la ici dans cette fenêtre seulement (clic droit), jamais dans une conversation.\n');
+    const apiKey = await ask('Clé API Render :');
+    try {
+      const r = await redeployRender({ apiKey, serviceId: m.serviceId, expectVersion: VERSION, log: say });
+      say(`\n✓ TERMINÉ. Version ${r.version} en ligne :\n\n    ${r.url}\n`);
+      say('Sur le téléphone / la tablette : fermez puis rouvrez l\'application (ou F5 sur PC).');
+    } catch (e) { stop(e.message); }
     rl.close(); return;
   }
 

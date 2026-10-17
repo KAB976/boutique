@@ -11,7 +11,9 @@ METHODE RAPIDE (automatique)
 Si une etape bloque, la methode manuelle ci-dessous fait la meme chose a la main.
 Note : le depot GitHub est cree en "public" pour que Render puisse le lire sans autre manipulation.
 Il contient seulement le programme : jamais vos donnees ni vos cles (elles restent dans Supabase et Render).
-Pour une mise a jour plus tard : recopiez les nouveaux fichiers puis relancez MISE-EN-LIGNE.bat.
+Pour une mise a jour plus tard : recopiez les nouveaux fichiers par-dessus, relancez MISE-EN-LIGNE.bat,
+collez la cle Render (dans la fenetre noire seulement) : le script relance le serveur, attend, puis verifie
+que la bonne version est en ligne. Vos donnees ne sont pas touchees.
 
 -------------------------------------------------------------------------------------
 METHODE MANUELLE (secours)

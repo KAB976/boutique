@@ -66,3 +66,48 @@ export async function deployToRender({ apiKey, repoUrl, env, name = 'boutique', 
   }
   throw new Error('Le déploiement prend plus de 20 minutes. Regardez l\'avancement sur https://dashboard.render.com');
 }
+
+/**
+ * Mise à jour d'un service existant : relance un déploiement SANS toucher aux variables (clés Supabase conservées),
+ * attend qu'il soit en ligne, puis vérifie que la version en ligne est bien la bonne.
+ */
+export async function redeployRender({ apiKey, serviceId, expectVersion, base = 'https://api.render.com/v1', fetchFn = fetch, sleep = sleepReal, log = console.log, maxWaitMs = 20 * 60_000 }) {
+  const call = async (method, p, body) => {
+    const res = await fetchFn(`${base}${p}`, {
+      method, headers: { authorization: `Bearer ${apiKey}`, accept: 'application/json', ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    let data = null; try { data = text ? JSON.parse(text) : null; } catch { /* texte brut */ }
+    if (!res.ok) { const e = new Error(`Render a répondu ${res.status}${data?.message ? ` : ${data.message}` : ''}`); e.status = res.status; throw e; }
+    return data;
+  };
+  const svc = await call('GET', `/services/${serviceId}`);
+  const url = svc?.serviceDetails?.url || svc?.url;
+  const d = await call('POST', `/services/${serviceId}/deploys`, { clearCache: 'clear' });
+  const deployId = (d?.deploy || d)?.id;
+  if (!deployId) throw new Error('Render n\'a pas démarré le déploiement.');
+  log('Déploiement lancé sur Render. Compter 3 à 6 minutes.');
+  const started = Date.now(); let last = '';
+  while (Date.now() - started < maxWaitMs) {
+    const x = await call('GET', `/services/${serviceId}/deploys/${deployId}`);
+    const st = (x?.deploy || x)?.status || 'en attente';
+    if (st !== last) { log(`  état du déploiement : ${st}`); last = st; }
+    if (st === 'live') break;
+    if (['build_failed', 'update_failed', 'canceled', 'pre_deploy_failed'].includes(st)) {
+      throw new Error(`Le déploiement a échoué (${st}). Ouvrez https://dashboard.render.com, votre service, onglet « Logs », et envoyez-moi les dernières lignes.`);
+    }
+    await sleep(10_000);
+    if (Date.now() - started >= maxWaitMs) throw new Error('Le déploiement prend plus de 20 minutes. Regardez https://dashboard.render.com');
+  }
+  // Vérification : la version en ligne est-elle la bonne ? (le serveur peut mettre un instant à répondre)
+  let seen = null;
+  for (let i = 0; i < 12; i++) {
+    try {
+      const r = await fetchFn(`${url}/api/public`, { headers: { accept: 'application/json' } });
+      if (r.ok) { seen = (await r.json()).version ?? null; if (seen === expectVersion) return { url, version: seen }; }
+    } catch { /* pas encore prêt */ }
+    await sleep(5_000);
+  }
+  throw new Error(`Le service est en ligne mais affiche la version « ${seen ?? 'inconnue'} » au lieu de « ${expectVersion} ». Dites-le-moi.`);
+}

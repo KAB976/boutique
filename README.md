@@ -1,8 +1,6 @@
-# Boutique — étape 2 : ingrédients, achats, stock
+# Boutique — version 1.1
 
-Gestion de snack / traiteur. Cette livraison contient les **étapes 1 et 2** du plan validé :
-socle (comptes, rôles, journal des actions, réglages, sauvegardes) puis ingrédients, réceptions, stock.
-Les étapes suivantes (recettes, production, caisse…) ne sont volontairement pas là : chacune sera livrée après votre accord.
+Gestion de snack / traiteur : **étapes 1 à 9** livrées ensemble — socle (comptes, rôles, journal), ingrédients et stock, recettes, production et coûts, articles et caisse (hors-ligne), promotions et fidélité, clients et fournisseurs, traiteur, gestion (profit réel, exports PDF et Excel). Voir la section « Étapes 4 à 9 » plus bas.
 
 ## Mise en ligne gratuite (tablette, téléphone, n'importe où)
 
@@ -73,6 +71,19 @@ l'interface ne fait que masquer les boutons. Choix à confirmer : le gérant peu
 - **Alertes** : stock bas ou vide, lots proche de la date limite, hausse de prix (seuil réglable, 10 % par défaut), prix à compléter.
 - Pas d'allergènes (selon votre choix). Le café en capsules est un ingrédient compté à la pièce ; les produits revendus tels quels (canettes, bouteilles) viendront avec les produits (étape 5).
 
+## Ce que fait l'étape 3 (recettes)
+
+- **Fiches recettes** : ingrédients avec quantité dans l'unité de votre choix (g, cuillères, tasses, pièces, sacs…), nombre de personnes pour lequel la recette est écrite, temps de préparation et de cuisson, étapes, notes. Une recette ne contient que des ingrédients (pas de sous-recettes).
+- **Ingrédients pas encore dans votre liste** : une recette intéressante peut être enregistrée même si vous n'avez pas encore créé tous ses ingrédients (choix « ➕ Pas dans ma liste » : nom, quantité et unité libres). Elle se range directement dans l'archive. Ces lignes sont signalées partout (« pas dans vos ingrédients », « à créer »), comptées comme « coût incomplet », et se calculent pour N personnes comme les autres. Quand l'ingrédient est créé dans Stock, on le choisit dans la liste en modifiant la recette.
+- **À l'ouverture d'une recette** (archive ou non) : pour N personnes, un bandeau dit si tout est en stock ou liste ce qu'il faut acheter avant de produire (emballages entiers, ingrédients pas encore créés compris).
+- **Versions** : chaque modification du contenu crée une nouvelle version (qui, quand, pourquoi) ; les anciennes restent consultables et ne se modifient jamais. « Revenir à celle-ci » crée une nouvelle version identique, rien n'est effacé. Si deux appareils modifient en même temps, le second est prévenu au lieu d'écraser.
+- **Calcul pour N personnes** : quantités proportionnelles, dans l'unité saisie, avec la quantité à sortir du stock quand l'ingrédient a une perte (rendement). Case « comparer au stock » : en stock, à acheter, en emballages entiers. Ce calcul n'écrit rien dans le stock (la production vient à l'étape 4).
+- **Coûts** (propriétaire et gérant seulement) : coût moyen pondéré actuel du stock, rendement compris, total et par personne ; un ingrédient sans prix d'achat est signalé (« coût incomplet »). Le cuisinier voit les recettes sans aucun coût.
+- **Archive** : une recette archivée sort de la liste de travail mais reste consultable, calculable, modifiable (on la complète au fil du temps), avec ses photos, et restaurable. On peut créer une recette directement dans l'archive.
+- **Photos** : 8 par recette, réduites automatiquement sur l'appareil (1280 px, environ 100 à 300 ko). Elles sont stockées à part de la base (un fichier par photo) sur le serveur et dans Supabase : elles ne ralentissent pas la copie de la base.
+- **Impression / PDF** : bouton sur la fiche (la signature KAB figure en bas à droite de chaque page). Choisissez « Enregistrer au format PDF » dans la fenêtre d'impression.
+- **Signature « KAB »** : en bas à droite de tous les écrans et de toutes les pages imprimées, police Comic Sans MS (Windows, Mac, iPhone) ; sur Android, où cette police n'existe pas, une police voisine (Comic Neue) est fournie avec l'application.
+
 ## Hypothèses et limites propres à l'étape 2
 
 - **Dates limites** : le stock consommé est supposé sortir d'abord des lots les plus anciens (premier entré, premier sorti). Si vous prenez un lot récent avant un ancien, l'alerte de péremption peut être inexacte.
@@ -83,7 +94,7 @@ l'interface ne fait que masquer les boutons. Choix à confirmer : le gérant peu
 
 ## Tests
 
-`npm test` : 47 tests automatiques. Étape 2 : coût moyen égal au calcul fait à la main, conversion impossible refusée, stock = somme du journal, cuisinier sans aucun prix, journal infalsifiable, migration depuis l'étape 1. Étape 1 : les critères de réception (caissier sans accès au stock,
+`npm test` : 69 tests automatiques. Étape 3 : versions immuables (même en SQL), conflit de version, coûts avec rendement, aucun coût pour le cuisinier, calcul N personnes, photos en ligne et rapatriement, photos d'une autre recette inaccessibles. Étape 2 : coût moyen égal au calcul fait à la main, conversion impossible refusée, stock = somme du journal, cuisinier sans aucun prix, journal infalsifiable, migration depuis l'étape 1. Étape 1 : les critères de réception (caissier sans accès au stock,
 journal complet et infalsifiable, sauvegarde restaurable) et sur les cas limites (blocage, sessions, import
 piégé, redémarrage…). Les parcours d'écran ont été joués dans un navigateur réel.
 
@@ -99,3 +110,37 @@ piégé, redémarrage…). Les parcours d'écran ont été joués dans un naviga
 - Quelqu'un qui connaît un nom peut bloquer son compte une minute en tapant de faux codes.
 - Pas encore testé : imprimante de tickets, hébergement réel, utilisation à plusieurs appareils en même temps.
 - `node:sqlite` est encore signalé « expérimental » par Node 22 (le message est masqué au démarrage) ; il est stable pour cet usage.
+
+## Étapes 4 à 9 (version 1.0)
+
+Argent : en **centimes entiers** partout (ventes, paiements, ardoises). Les coûts d'ingrédients sont en euros (décimaux). Numérotation : `V20261008-0001` ventes (par jour), `A…` remboursements, `Z-0001` clôtures, `P-00001` productions, `BC-0001` bons de commande, `T-0001` traiteur.
+
+- **Production** : la recette produit N portions ; coût réel calculé au coût moyen pondéré, stock d'ingrédients décrémenté, lot d'articles préparés créé. Quantités réellement utilisées modifiables ; annulation possible tant que rien n'a été vendu du lot ; pertes/invendus et comptage avec motif.
+- **Articles** : *préparé à l'avance* (lot), *à la minute* (consomme les ingrédients de la recette à la vente), *revendu* (ex. canette), *libre* (sans stock). Une vente n'est **jamais bloquée** par le stock : un stock négatif est signalé (`stock_negative`).
+- **Caisse** : paiements multiples (espèces avec rendu, carte, ardoise, bon…), ventes idempotentes (`client_uuid`), changement de prix pendant la vente = erreur 409 `price_changed`. **Hors-ligne** : la vente est gardée dans l'appareil (ticket provisoire `H…`), envoyée toute seule au retour du réseau, au prix montré au client ; l'écart éventuel est absorbé par la boutique et signalé (`offline_gap`). Hors-ligne, seule la caisse est disponible.
+- **Remboursement** = annulation **totale** d'une vente (pas de remboursement partiel) ; une seule fois par vente ; un caissier ne peut annuler que sa propre vente du jour, avant clôture.
+- **Clôture Z** : attendu = fond de caisse + espèces nettes + mouvements de caisse ; un écart exige une note ; le fond du lendemain = fond laissé.
+- **Promotions** (moteur commun serveur/client) : 2 achetés = 1 offert (le moins cher du groupe), lot à prix fixe (les unités les moins chères, jamais négatif), pourcentage, montant (par article). Une seule promotion par unité, la plus avantageuse pour le client. Remise manuelle réservée au droit `promotions.manage`. Fidélité : tampons par tranche de dépense, récompense plafonnée au total.
+- **Clients / ardoise** : limite de crédit, encaissement de dettes (espèces = mouvement de caisse). **Fournisseurs** : bons de commande, réception (met à jour le stock et le coût moyen), dettes et paiements.
+- **Traiteur** : devis → confirmé → préparé → livré (ou annulé), acomptes, liste de courses, lien avec la production.
+- **Gestion** : profit réel = marge des ventes (HT − coût) + marge du traiteur livré − dépenses − pertes. Les achats ne comptent pas (ils entrent dans le coût à la vente). Export Excel (`.xlsx`, sans dépendance) et impression PDF.
+- Frontières de clôture déterminées par l'identifiant de vente (pas par l'heure).
+
+Tests : `npm test`.
+
+## Mettre à jour une installation en ligne
+
+`MISE-EN-LIGNE.bat` : envoie le programme sur GitHub, puis demande la clé API Render (à coller **dans la fenêtre noire seulement**), relance le déploiement sans toucher aux clés Supabase, attend « live » et **vérifie que la version en ligne est la bonne (1.1.0)**.
+
+## Version 1.1 : commandes envoyées à la cuisine, avec sons et notifications
+
+- **Prendre une commande** (Caisse → « Envoyer en cuisine ») : on choisit une table ou un nom de client (« Table 4 », « Mme Diallo »), une remarque facultative, puis **« Envoyer (payer plus tard) »** ou **« Envoyer et payer maintenant »**. Plusieurs envois pour la même table s'additionnent.
+- **Écran « Commandes »** (cuisine et salle, mis à jour toutes les 4 secondes) : colonnes Nouvelles / En préparation / Prêtes à servir. La cuisine touche « Je prépare » puis « ✓ Prête » ; la personne de salle touche « Servie ✓ ». Une carte devient orange après 15 minutes d'attente.
+- **Sons** (application ouverte) : nouvelle commande = sonnerie qui se répète toutes les 8 s jusqu'à « Je prépare » ; commande prête = mélodie chez la personne qui l'a prise, répétée toutes les 20 s jusqu'à « Servie ». Le navigateur exige un toucher de l'écran après chaque ouverture (bandeau « Touchez ici pour activer le son »).
+- **Notifications du téléphone** (Web Push, standard du navigateur), même écran verrouillé et application fermée : nouvelle commande → comptes cuisine (cuisinier, gérant, propriétaire), sauf l'auteur ; commande prête → **la personne qui a pris la commande** (si elle n'a aucun appareil abonné : tous les comptes de salle) ; commande annulée → cuisine. Chaque appareil s'abonne lui-même : Mon compte → « Activer les notifications ». Les clés (VAPID) sont créées automatiquement et gardées dans la base (table `server_secrets`, jamais envoyées au navigateur). **iPhone/iPad** : l'application doit d'abord être ajoutée à l'écran d'accueil (Safari → Partager).
+- **Additions ouvertes** (Caisse → « 📋 Additions ouvertes ») : toutes les commandes non payées d'une même table ; « Encaisser cette addition » remplit le panier ; la vente rattache les commandes (`order_ids`). Une addition ne peut pas être encaissée deux fois (409 `order_paid`), ni si une commande a été annulée entre-temps (409 `order_cancelled`) : dans ces cas rien n'est enregistré.
+- **Stock** : une commande ne touche pas au stock ; le stock et le coût sont comptés à l'encaissement, comme avant.
+- **Articles « pas pour la cuisine »** (case dans la fiche article ; coché par défaut sauf « revendu tel quel ») : ils figurent sur l'addition mais pas sur l'écran cuisine ; une commande sans aucun article de cuisine est directement « servie » et ne notifie personne.
+- **Annulation** : le serveur peut annuler sa propre commande tant que la cuisine n'a pas commencé ; ensuite seulement le gérant / propriétaire, avec un motif (écrit dans le journal). Une commande déjà encaissée se corrige par un remboursement.
+- **Limites connues** : envoi de commande et additions nécessitent le réseau (la caisse hors-ligne reste possible pour les ventes directes). Les notifications dépendent du service de notification du téléphone (Google/Apple) et peuvent arriver avec du retard ; le plus fiable reste un téléphone/tablette de cuisine branché, écran allumé, sur l'onglet Commandes (cela évite aussi que le serveur gratuit de Render s'endorme). Un test de notification réel n'a pas pu être fait depuis l'environnement de développement : bouton « Envoyer un test » dans Mon compte.
+- Nouveaux droits : `orders.view` (tous), `orders.take` / `orders.serve` (propriétaire, gérant, caissier), `orders.kitchen` (propriétaire, gérant, cuisinier), `orders.cancel_any` (propriétaire, gérant).

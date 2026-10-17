@@ -6,14 +6,40 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Settings from './pages/Settings.jsx';
 import Stock from './pages/Stock.jsx';
+import Recipes from './pages/Recipes.jsx';
 import Users from './pages/Users.jsx';
 import Audit from './pages/Audit.jsx';
 import Backups from './pages/Backups.jsx';
 import Account from './pages/Account.jsx';
+import Pos from './pages/Pos.jsx';
+import Sales from './pages/Sales.jsx';
+import Kitchen from './pages/Kitchen.jsx';
+import Products from './pages/Products.jsx';
+import Customers from './pages/Customers.jsx';
+import Suppliers from './pages/Suppliers.jsx';
+import Catering from './pages/Catering.jsx';
+import Promotions from './pages/Promotions.jsx';
+import Management from './pages/Management.jsx';
+import Orders from './pages/Orders.jsx';
+import { cache } from './offline.js';
+import { startBoard, stopBoard, useBoard, pendingAlerts } from './board.js';
+import { resyncPush, detachPush } from './alerts.js';
+import { setShopTz } from './money.js';
 
 const TABS = [
   { id: 'home', label: 'Accueil', perm: null, Page: Home },
+  { id: 'pos', label: 'Caisse', perm: 'pos.sell', Page: Pos },
+  { id: 'orders', label: 'Commandes', perm: 'orders.view', Page: Orders },
+  { id: 'sales', label: 'Ventes et clôture', perm: 'sales.view_own', Page: Sales },
+  { id: 'kitchen', label: 'Cuisine', perm: 'production.do', Page: Kitchen },
+  { id: 'recipes', label: 'Recettes', perm: 'recipes.view', Page: Recipes },
   { id: 'stock', label: 'Stock', perm: 'stock.view', Page: Stock },
+  { id: 'products', label: 'Articles', perm: 'products.edit', Page: Products },
+  { id: 'catering', label: 'Traiteur', perm: 'catering.view', Page: Catering },
+  { id: 'customers', label: 'Clients', perm: 'customers.view', Page: Customers },
+  { id: 'suppliers', label: 'Fournisseurs', perm: 'purchasing.manage', Page: Suppliers },
+  { id: 'promotions', label: 'Promotions', perm: 'promotions.manage', Page: Promotions },
+  { id: 'management', label: 'Gestion', perm: 'stats.view', Page: Management },
   { id: 'settings', label: 'Réglages', perm: 'settings.edit', Page: Settings },
   { id: 'users', label: 'Comptes', perm: 'users.manage', Page: Users },
   { id: 'audit', label: 'Journal', perm: 'audit.view', Page: Audit },
@@ -21,13 +47,27 @@ const TABS = [
   { id: 'account', label: 'Mon compte', perm: null, Page: Account },
 ];
 
+const firstTab = (u) => (u.role === 'cashier' ? 'pos' : u.role === 'cook' ? 'orders' : 'home');
+
+function AlertBar({ me, tab, go }) {
+  const b = useBoard();
+  const a = pendingAlerts(b.data);
+  if (tab === 'orders') return null;
+  const items = [];
+  if (a.newOrders.length) items.push(<button key="n" className="banner alert-new" onClick={() => go('orders')}><span><strong>🍽 {a.newOrders.length} nouvelle{a.newOrders.length > 1 ? 's' : ''} commande{a.newOrders.length > 1 ? 's' : ''}</strong> : {a.newOrders.slice(0, 3).map((o) => o.label).join(', ')}</span><span className="link">Voir</span></button>);
+  if (a.ready.length) items.push(<button key="r" className="banner alert-ready" onClick={() => go('orders')}><span><strong>✅ {a.ready.map((o) => o.label).slice(0, 4).join(', ')}{a.ready.length > 4 ? '…' : ''}</strong> {a.ready.length > 1 ? 'sont prêtes' : 'est prête'} : à servir</span><span className="link">Voir</span></button>);
+  return items.length ? <div className="alert-bar">{items}</div> : null;
+}
+
 export default function App() {
+  const boardNow = useBoard();
   const [phase, setPhase] = useState('loading'); // loading | setup | login | app | error
   const [me, setMe] = useState(null);
   const [pub, setPub] = useState({ shop_name: '', logo: '' });
   const [tab, setTab] = useState('home');
   const [message, setMessage] = useState('');
   const [fatal, setFatal] = useState('');
+  const [away, setAway] = useState(false); // appareil sans réseau : on ouvre la caisse avec ce qui est en mémoire
 
   const toLogin = useCallback((msg = '') => {
     setToken(null); setMe(null); setMessage(msg); setPhase('login');
@@ -38,21 +78,39 @@ export default function App() {
   const boot = useCallback(async () => {
     try {
       const [{ needsSetup }, p] = await Promise.all([api.get('/api/setup/status'), api.get('/api/public')]);
-      setPub(p);
+      setPub(p); cache.set('pub', p); setShopTz(p.timezone);
       if (needsSetup) { setPhase('setup'); return; }
       if (getToken()) {
-        try { setMe(await api.get('/api/me')); setPhase('app'); return; } catch { /* session terminée */ }
+        try { const m = await api.get('/api/me'); cache.set('me', m); setMe(m); setTab((t) => (t === 'home' ? firstTab(m) : t)); setAway(false); setPhase('app'); return; } catch (e) { if (e.code === 'network') throw e; /* session terminée */ }
       }
       setPhase('login');
-    } catch (e) { setFatal(e.message); setPhase('error'); }
+    } catch (e) {
+      const saved = cache.get('me');
+      if (e.code === 'network' && getToken() && saved) { // pas de réseau : la caisse reste utilisable
+        const p = cache.get('pub'); if (p) { setPub(p); setShopTz(p.timezone); }
+        setMe(saved); setAway(true); setTab('pos'); setPhase('app'); return;
+      }
+      setFatal(e.message); setPhase('error');
+    }
   }, []);
   useEffect(() => { boot(); }, [boot]);
 
+  useEffect(() => {
+    if (phase === 'app' && me && !away) { startBoard(me); resyncPush(); return () => stopBoard(); }
+    stopBoard(); return undefined;
+  }, [phase, me, away]);
+  useEffect(() => {
+    const open = (e) => { try { const t = new URL(e.detail, location.origin).searchParams.get('tab'); if (t) setTab(t); } catch { /* adresse invalide */ } };
+    window.addEventListener('boutique:open', open);
+    const t0 = new URLSearchParams(location.search).get('tab'); if (t0) setTab(t0);
+    return () => window.removeEventListener('boutique:open', open);
+  }, []);
+
   useEffect(() => { document.title = pub.shop_name ? `${pub.shop_name} · Boutique` : 'Boutique'; }, [pub.shop_name]);
 
-  const onAuthed = (token, user) => { setToken(token); setMe(user); setTab('home'); setMessage(''); setPhase('app'); api.get('/api/public').then(setPub).catch(() => {}); };
+  const onAuthed = (token, user) => { setToken(token); setMe(user); cache.set('me', user); setTab(firstTab(user)); setMessage(''); setPhase('app'); api.get('/api/public').then((p) => { setPub(p); cache.set('pub', p); setShopTz(p.timezone); }).catch(() => {}); };
 
-  const logout = async () => { try { await api.post('/api/auth/logout'); } catch { /* déjà déconnecté */ } toLogin(); };
+  const logout = async () => { await detachPush(); stopBoard(); try { await api.post('/api/auth/logout'); } catch { /* déjà déconnecté */ } cache.del('me'); toLogin(); };
 
   if (phase === 'loading') return <div className="center muted">Chargement…</div>;
   if (phase === 'error') return (
@@ -62,7 +120,8 @@ export default function App() {
   if (phase === 'login') return <Login pub={pub} message={message} onDone={onAuthed} />;
 
   const mustChange = me.mustChangePin;
-  const tabs = TABS.filter((t) => !t.perm || me.permissions.includes(t.perm));
+  const badge = (() => { const a = pendingAlerts(boardNow.data); return a.newOrders.length + a.ready.length; })();
+  const tabs = TABS.filter((t) => (!t.perm || me.permissions.includes(t.perm)) && (!away || t.id === 'pos' || t.id === 'account'));
   const current = mustChange ? TABS.find((t) => t.id === 'account') : tabs.find((t) => t.id === tab) || tabs[0];
   const Page = current.Page;
 
@@ -75,13 +134,15 @@ export default function App() {
         </div>
         <div className="who"><span>{me.name}</span><span className="badge">{me.roleLabel}</span><button onClick={logout}>Se déconnecter</button></div>
       </header>
+      {away && <div className="banner off" style={{ margin: '0 0 8px' }}><span><strong>Pas de réseau.</strong> Seule la caisse est disponible ; les ventes partiront dès le retour du réseau.</span><button onClick={() => { setPhase('loading'); boot(); }}>Réessayer</button></div>}
+      {!mustChange && !away && <AlertBar me={me} tab={current.id} go={setTab} />}
       {!mustChange && (
         <nav className="tabs" aria-label="Menu">
-          {tabs.map((t) => <button key={t.id} className={t.id === current.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}
+          {tabs.map((t) => <button key={t.id} className={t.id === current.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}{t.id === 'orders' && badge > 0 ? <span className="count">{badge}</span> : null}</button>)}
         </nav>
       )}
       <main>
-        <Page me={me} forced={mustChange} onPublicChange={() => api.get('/api/public').then(setPub)} onPinChanged={() => { setTab('account'); api.get('/api/me').then(setMe); }} onRelogin={toLogin} />
+        <Page me={me} go={setTab} forced={mustChange} onPublicChange={() => api.get('/api/public').then(setPub)} onPinChanged={() => { setTab('account'); api.get('/api/me').then(setMe); }} onRelogin={toLogin} />
       </main>
     </div>
   );

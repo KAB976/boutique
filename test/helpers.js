@@ -30,6 +30,7 @@ export async function boot({ start = '2026-10-07T08:00:00Z', dir } = {}) {
     post: (u, body, o = {}) => call('POST', u, { ...o, body }),
     put: (u, body, o = {}) => call('PUT', u, { ...o, body }),
     patch: (u, body, o = {}) => call('PATCH', u, { ...o, body }),
+    delete: (u, o = {}) => call('DELETE', u, o),
   };
 
   async function setup(shopName = 'Chez Test') {

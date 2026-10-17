@@ -179,6 +179,17 @@ export class CloudSync {
     await this.remote.remove([...old, ...drop]);
   }
 
+  /** Photos : un fichier par photo, nommé d'après son empreinte (jamais modifié). Déjà présent = rien à refaire. */
+  async putPhoto(name, buf) {
+    if (!/^[0-9a-f]{64}\.jpg$/.test(name)) throw new Error('nom de photo invalide');
+    try { await this.remote.put(`photos/${name}`, buf); }
+    catch (e) { if (!([400, 409].includes(e.status) && /exist|duplicate/i.test(e.body || ''))) throw e; }
+  }
+  async getPhoto(name) {
+    if (!/^[0-9a-f]{64}\.jpg$/.test(name)) throw new Error('nom de photo invalide');
+    return this.remote.get(`photos/${name}`);
+  }
+
   /** Vérification de connexion (écriture + lecture d'un petit fichier). */
   async selfTest() {
     await this.remote.ensureBucket();

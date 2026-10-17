@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBox, Notice, PinPad, useAsync } from '../ui.jsx';
+import NotifyCard from './Notify.jsx';
 
 export default function Account({ me, forced, onPinChanged }) {
   const [phase, setPhase] = useState('current'); // current | new | confirm
@@ -31,6 +32,7 @@ export default function Account({ me, forced, onPinChanged }) {
         <p className="muted">Rôle : {me.roleLabel}</p>
         {forced && <Notice tone="warn">Votre code est provisoire. Choisissez le vôtre pour continuer.</Notice>}
       </section>
+      {!forced && <NotifyCard />}
       <section className="card narrow-card">
         <h2>Changer mon code PIN</h2>
         <ErrorBox error={error} />

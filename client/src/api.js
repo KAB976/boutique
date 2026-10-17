@@ -42,6 +42,7 @@ export const api = {
   post: (p, body) => request('POST', p, { body }),
   put: (p, body) => request('PUT', p, { body }),
   patch: (p, body) => request('PATCH', p, { body }),
+  delete: (p) => request('DELETE', p),
   upload: (p, file) => request('POST', p, { raw: file }),
   download: (p) => request('GET', p, { blob: true }),
 };

@@ -9,4 +9,4 @@ export class HttpError extends Error {
 export const bad = (message, code = 'invalid') => new HttpError(400, code, message);
 export const forbidden = (message = "Vous n'avez pas le droit de faire cela.") => new HttpError(403, 'forbidden', message);
 export const notFound = (message = 'Introuvable.') => new HttpError(404, 'not_found', message);
-export const conflict = (message, code = 'conflict') => new HttpError(409, code, message);
+export const conflict = (message, code = 'conflict', extra = {}) => new HttpError(409, code, message, extra);

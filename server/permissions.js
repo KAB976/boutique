@@ -36,6 +36,25 @@ export const PERMISSIONS = {
   'purchasing.manage':  ['owner', 'manager'],
   'promotions.manage':  ['owner', 'manager'],
   'stats.view':         ['owner', 'manager'],
+  // étapes 4 à 9
+  'catalog.view':       ALL,
+  'products.edit':      ['owner', 'manager'],
+  'customers.view':     ['owner', 'manager', 'cashier'],
+  'customers.edit':     ['owner', 'manager', 'cashier'],
+  'customers.credit':   ['owner', 'manager'],
+  'customers.payment':  ['owner', 'manager', 'cashier'],
+  'cash.move':          ['owner', 'manager', 'cashier'],
+  'catering.view':      ['owner', 'manager', 'cook'],
+  'catering.edit':      ['owner', 'manager'],
+  'expenses.manage':    ['owner', 'manager'],
+  'production.void':    ['owner', 'manager'],
+  'sales.sync':         ['owner', 'manager', 'cashier'],
+  // version 1.1 : commandes envoyées à la cuisine
+  'orders.view':        ALL,
+  'orders.take':        ['owner', 'manager', 'cashier'],
+  'orders.serve':       ['owner', 'manager', 'cashier'],
+  'orders.kitchen':     ['owner', 'manager', 'cook'],
+  'orders.cancel_any':  ['owner', 'manager'],
 };
 
 export const can = (role, perm) => Boolean(PERMISSIONS[perm]?.includes(role));

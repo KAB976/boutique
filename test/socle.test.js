@@ -108,9 +108,9 @@ test('CRITÈRE : un caissier ne voit pas le stock ni les coûts ; droits de chaq
     await expect(cook.token, 'get', '/api/stock', 200);
     await expect(manager.token, 'get', '/api/stock', 200);
     await expect(owner, 'get', '/api/stock', 200);
-    await expect(cashier.token, 'get', '/api/costs', 403);
-    await expect(cook.token, 'get', '/api/costs', 403);
-    await expect(manager.token, 'get', '/api/costs', 200);
+    await expect(cashier.token, 'get', '/api/reports', 403);
+    await expect(cook.token, 'get', '/api/reports', 403);
+    await expect(manager.token, 'get', '/api/reports', 200);
     // utilisateurs : propriétaire seulement
     for (const w of [manager.token, cashier.token, cook.token]) {
       await expect(w, 'get', '/api/users', 403);
