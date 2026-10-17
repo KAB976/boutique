@@ -82,12 +82,14 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
     return { user: row, tokenHash: row.token_hash };
   }
 
+  const selfPinOn = () => Number(getSetting(ctx.db, 'self_pin_change')) === 1;
+  const canSelfPin = (u) => u.role === 'owner' || selfPinOn();
   const PIN_EXEMPT = new Set(['/api/me', '/api/me/pin', '/api/auth/logout']);
   const auth = (req, res, next) => {
     const { user, tokenHash } = authenticate(req);
     req.user = user;
     req.tokenHash = tokenHash;
-    if (user.must_change_pin && !PIN_EXEMPT.has(req.baseUrl + req.path)) {
+    if (user.must_change_pin && canSelfPin(user) && !PIN_EXEMPT.has(req.baseUrl + req.path)) {
       throw new HttpError(403, 'pin_change_required', 'Vous devez d\'abord choisir un nouveau code PIN.');
     }
     next();
@@ -99,7 +101,7 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
 
   const mePayload = (u) => ({
     id: u.id, name: u.name, role: u.role, roleLabel: ROLE_LABELS[u.role],
-    mustChangePin: Boolean(u.must_change_pin), permissions: permissionsOf(u.role),
+    mustChangePin: Boolean(u.must_change_pin) && canSelfPin(u), canChangePin: canSelfPin(u), permissions: permissionsOf(u.role),
   });
 
   const cleanName = (v) => {
@@ -219,6 +221,7 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
   api.get('/me', auth, (req, res) => res.json(mePayload(req.user)));
 
   api.post('/me/pin', auth, need('account.self'), (req, res) => {
+    if (!canSelfPin(req.user)) throw forbidden('Seul l\'administrateur peut changer votre code. Demandez-lui.');
     const { currentPin, newPin } = req.body || {};
     if (typeof currentPin !== 'string' || !verifyPin(currentPin, req.user.pin_hash)) throw bad('Le code PIN actuel est incorrect.', 'bad_pin');
     checkPin(newPin);
@@ -273,8 +276,8 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
     const u = tx(ctx.db, () => {
       if (nameTaken(n)) throw conflict('Un compte actif porte déjà ce nom.', 'name_taken');
       const t = iso();
-      const r = ctx.db.prepare('INSERT INTO users (name, pin_hash, role, must_change_pin, created_at, updated_at) VALUES (?,?,?,1,?,?)')
-        .run(n, hashPin(pin), role, t, t);
+      const r = ctx.db.prepare('INSERT INTO users (name, pin_hash, role, must_change_pin, created_at, updated_at) VALUES (?,?,?,?,?,?)')
+        .run(n, hashPin(pin), role, selfPinOn() ? 1 : 0, t, t);
       const id = Number(r.lastInsertRowid);
       writeAudit(ctx.db, t, actorOf(req.user), 'user.create', { entity: 'user', entityId: id, detail: { name: n, role } });
       return ctx.db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -326,8 +329,8 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
     tx(ctx.db, () => {
       const cur = ctx.db.prepare('SELECT * FROM users WHERE id = ?').get(id);
       if (!cur) throw notFound('Compte introuvable.');
-      ctx.db.prepare('UPDATE users SET pin_hash = ?, must_change_pin = 1, failed_count = 0, locked_until = NULL, updated_at = ? WHERE id = ?')
-        .run(hashPin(req.body.pin), iso(), id);
+      ctx.db.prepare('UPDATE users SET pin_hash = ?, must_change_pin = ?, failed_count = 0, locked_until = NULL, updated_at = ? WHERE id = ?')
+        .run(hashPin(req.body.pin), selfPinOn() ? 1 : 0, iso(), id);
       ctx.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
       writeAudit(ctx.db, iso(), actorOf(req.user), 'user.pin_reset', { entity: 'user', entityId: id, detail: { name: cur.name } });
     });

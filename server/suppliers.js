@@ -1,4 +1,5 @@
 import { tx } from './db.js';
+import { assertDrawer } from './shifts.js';
 import { bad, notFound, conflict } from './errors.js';
 import { writeAudit } from './audit.js';
 import { cents, text, number, dateStr, nextNumber } from './common.js';
@@ -149,6 +150,7 @@ export function paySupplier(db, ts, day, actor, id, b, { fromCash = false } = {}
     if (amount > bal) throw conflict('Le paiement dépasse ce que vous lui devez.', 'too_much');
     const r = db.prepare('INSERT INTO supplier_ledger (supplier_id, ts, type, amount_cents, method, note, user_name) VALUES (?,?,?,?,?,?,?)').run(id, ts, 'payment', -amount, method, text(b.note ?? '', 'Note', { max: 200 }) || null, actor?.name ?? null);
     if (method === 'cash' && b.from_drawer) {
+      assertDrawer(db, actor);
       db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, ref, user_id, user_name) VALUES (?,?,?,?,?,?,?)').run(ts, day, -amount, `Paiement fournisseur — ${s.name}`, `supplier:${Number(r.lastInsertRowid)}`, actor?.id ?? null, actor?.name ?? null);
     }
     writeAudit(db, ts, actor, 'supplier.payment', { entity: 'supplier', entityId: id, detail: { name: s.name, amount_cents: amount, method } });

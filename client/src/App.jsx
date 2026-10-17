@@ -20,10 +20,12 @@ import Suppliers from './pages/Suppliers.jsx';
 import Catering from './pages/Catering.jsx';
 import Promotions from './pages/Promotions.jsx';
 import Management from './pages/Management.jsx';
+import CashCheck from './pages/CashCheck.jsx';
 import Orders from './pages/Orders.jsx';
 import { cache } from './offline.js';
 import { startBoard, stopBoard, useBoard, pendingAlerts } from './board.js';
 import { resyncPush, detachPush } from './alerts.js';
+import { resetShift, loadShift } from './shift.js';
 import { setShopTz } from './money.js';
 
 const TABS = [
@@ -31,6 +33,7 @@ const TABS = [
   { id: 'pos', label: 'Caisse', perm: 'pos.sell', Page: Pos },
   { id: 'orders', label: 'Commandes', perm: 'orders.view', Page: Orders },
   { id: 'sales', label: 'Ventes et clôture', perm: 'sales.view_own', Page: Sales },
+  { id: 'cashcheck', label: 'Vérif. caisses', perm: 'cash.review', Page: CashCheck },
   { id: 'kitchen', label: 'Cuisine', perm: 'production.do', Page: Kitchen },
   { id: 'recipes', label: 'Recettes', perm: 'recipes.view', Page: Recipes },
   { id: 'stock', label: 'Stock', perm: 'stock.view', Page: Stock },
@@ -47,7 +50,7 @@ const TABS = [
   { id: 'account', label: 'Mon compte', perm: null, Page: Account },
 ];
 
-const firstTab = (u) => (u.role === 'cashier' ? 'pos' : u.role === 'cook' ? 'orders' : 'home');
+const firstTab = (u) => (u.role === 'cashier' ? 'pos' : u.role === 'cook' || u.role === 'waiter' ? 'orders' : 'home');
 
 function AlertBar({ me, tab, go }) {
   const b = useBoard();
@@ -110,7 +113,9 @@ export default function App() {
 
   const onAuthed = (token, user) => { setToken(token); setMe(user); cache.set('me', user); setTab(firstTab(user)); setMessage(''); setPhase('app'); api.get('/api/public').then((p) => { setPub(p); cache.set('pub', p); setShopTz(p.timezone); }).catch(() => {}); };
 
-  const logout = async () => { await detachPush(); stopBoard(); try { await api.post('/api/auth/logout'); } catch { /* déjà déconnecté */ } cache.del('me'); toLogin(); };
+  const logout = async () => {
+    try { const st = await api.get('/api/shift/current'); if (st.mine && !window.confirm(`Votre quart ${st.shift.number} est encore ouvert. Si vous partez maintenant, personne d'autre ne pourra encaisser avant que vous (ou le gérant) le fermiez.\n\nSe déconnecter quand même ?`)) return; } catch { /* hors-ligne */ }
+    resetShift(); await detachPush(); stopBoard(); try { await api.post('/api/auth/logout'); } catch { /* déjà déconnecté */ } cache.del('me'); toLogin(); };
 
   if (phase === 'loading') return <div className="center muted">Chargement…</div>;
   if (phase === 'error') return (

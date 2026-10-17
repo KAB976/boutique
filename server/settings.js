@@ -51,6 +51,9 @@ export const SETTINGS = {
   target_margin: { label: 'Marge cible par défaut (%)', def: 50, read: 'manage', check: num('Marge cible', 0, 95) },
   price_alert_pct: { label: 'Alerte de hausse de prix (%)', def: 10, read: 'manage', check: num('Alerte de hausse', 1, 500) },
   expiry_alert_days: { label: 'Alerte de péremption (jours avant)', def: 3, read: 'all', check: num('Alerte de péremption', 0, 60, { int: true }) },
+  self_pin_change: { label: 'Les employés peuvent changer leur propre code PIN (1 = oui, 0 = non : seul l\'administrateur le fait)', def: 0, read: 'manage', check: num('Changement de code', 0, 1, { int: true }) },
+  require_shift: { label: 'Quart de caisse obligatoire pour encaisser (1 = oui, 0 = non)', def: 1, read: 'manage', check: num('Quart obligatoire', 0, 1, { int: true }) },
+  cash_alert_eur: { label: 'Seuil d\'espèces en caisse (€, hors fond de caisse) : au-delà, le caissier doit verser ce montant et reçoit un rappel toutes les 10 minutes (0 = jamais)', def: 300, read: 'manage', check: num('Seuil d\'alerte', 0, 100000, { int: true }) },
   session_hours: { label: "Déconnexion après inactivité (heures)", def: 12, read: 'owner', check: num('Durée de session', 1, 72, { int: true }) },
   backup_keep:   { label: 'Sauvegardes automatiques conservées', def: 30, read: 'owner', check: num('Sauvegardes conservées', 7, 365, { int: true }) },
 };

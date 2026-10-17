@@ -48,6 +48,7 @@ export async function boot({ start = '2026-10-07T08:00:00Z', dir } = {}) {
   }
   /** Crée un utilisateur et le connecte (le PIN provisoire doit être changé ; on le fait). */
   async function staff(ownerToken, name, role, pin = '1357') {
+    await api.put('/api/settings', { self_pin_change: 1 }, { token: ownerToken });
     const u = await addUser(ownerToken, name, role, '9753');
     const l = await login(u.id, '9753');
     const ch = await api.post('/api/me/pin', { currentPin: '9753', newPin: pin }, { token: l.data.token });

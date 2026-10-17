@@ -1,4 +1,5 @@
 import { tx } from './db.js';
+import { assertDrawer } from './shifts.js';
 import { bad, notFound, conflict } from './errors.js';
 import { writeAudit } from './audit.js';
 import { cents, text } from './common.js';
@@ -63,6 +64,7 @@ export function receivePayment(db, ts, day, actor, id, body) {
       .run(id, ts, 'payment', -amount, method, note || null, actor?.id ?? null, actor?.name ?? null);
     const lid = Number(r.lastInsertRowid);
     if (method === 'cash') {
+      assertDrawer(db, actor);
       db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, ref, user_id, user_name) VALUES (?,?,?,?,?,?,?)')
         .run(ts, day, amount, `Règlement d'ardoise — ${c.name}`, `ledger:${lid}`, actor?.id ?? null, actor?.name ?? null);
     }

@@ -296,6 +296,7 @@ test('PIN provisoire : la personne doit en choisir un nouveau avant tout le rest
   const t = await boot();
   try {
     const owner = await t.setup();
+    await t.api.put('/api/settings', { self_pin_change: 1 }, { token: owner });
     const awa = await t.addUser(owner, 'Awa', 'cashier', '9753');
     assert.equal(awa.mustChangePin, true);
     const l = await t.login(awa.id, '9753');
@@ -534,5 +535,23 @@ test('journal consultable : filtres et pagination', async () => {
     assert.ok(onlySettings.rows.every((r) => r.action.startsWith('settings.')));
     assert.ok(onlySettings.rows[0].detail.address);
     assert.ok(onlySettings.rows[0].id > onlySettings.rows.at(-1).id, 'du plus récent au plus ancien');
+  } finally { await t.close(); }
+});
+
+test('Par défaut, seul l\'administrateur crée nom et code : pas de code provisoire, pas de changement par l\'employé', async () => {
+  const t = await boot();
+  try {
+    const owner = await t.setup();
+    const awa = await t.addUser(owner, 'Awa', 'cashier', '7531');
+    assert.equal(awa.mustChangePin, false);
+    const l = await t.login(awa.id, '7531');
+    assert.equal(l.data.user.mustChangePin, false);
+    assert.equal(l.data.user.canChangePin, false);
+    const ch = await t.api.post('/api/me/pin', { currentPin: '7531', newPin: '8642' }, { token: l.data.token });
+    assert.equal(ch.status, 403);
+    assert.equal((await t.api.post('/api/users', { name: 'X', role: 'cashier', pin: '2468' }, { token: l.data.token })).status, 403);
+    const rs = await t.api.post(`/api/users/${awa.id}/pin`, { pin: '8642' }, { token: owner });
+    assert.equal(rs.status, 200);
+    assert.equal((await t.login(awa.id, '8642')).data.user.mustChangePin, false);
   } finally { await t.close(); }
 });

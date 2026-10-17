@@ -8,7 +8,7 @@ import { loadMeasures, loadIngredient, stateOf, unitOptions } from './stock.js';
 import { fmtBase } from '../shared/units.js';
 import { createProduct, updateProduct, unitCost, available, batchBalance, KINDS } from './products.js';
 import { planProduction, produce, voidProduction, batchLoss, batchCount, BATCH_LOSS_REASONS } from './production.js';
-import { createSale, syncSales, refundSale, saleView, cashMove, closurePreview, closeCash, closureView, lastClosure, METHOD_LABELS } from './sales.js';
+import { createSale, syncSales, refundSale, saleView, cashMove, closurePreview, closeCash, closureView, blindPreview, lastClosure, resolveApprover, METHOD_LABELS } from './sales.js';
 import { createCustomer, updateCustomer, receivePayment, adjustLedger, adjustStamps, balanceOf as custBal, stampsOf } from './customers.js';
 import { createPromo, updatePromo, setLoyalty, TYPES as PROMO_TYPES } from './promotions.js';
 import * as sup from './suppliers.js';
@@ -16,6 +16,8 @@ import * as cat from './catering.js';
 import { createExpense, voidExpense, EXPENSE_CATEGORIES } from './expenses.js';
 import { report, reportSheets } from './reports.js';
 import { buildXlsx } from './xlsx.js';
+import { openShift, shiftStatus, shiftView, makeDeposit, requestDeposit } from './shifts.js';
+import { reviewOverview, validateClosure, closureDetail, depositDue, cashReminderTick } from './cash-review.js';
 
 export function registerPos({ api, ctx, auth, need, iso, actorOf }) {
   const db = () => ctx.db;
@@ -128,11 +130,16 @@ export function registerPos({ api, ctx, auth, need, iso, actorOf }) {
   const salesView = (v, role) => costStrip(v, role);
   api.post('/sales', auth, need('pos.sell'), (req, res) => {
     const out = createSale(ctx, actorOf(req.user), { ...req.body, offline: false });
+    try { cashReminderTick(ctx); } catch { /* le rappel ne doit jamais gêner une vente */ }
     res.status(out.duplicate ? 200 : 201).json({ duplicate: out.duplicate, sale: salesView(out.sale, req.user.role) });
   });
+  // vérifie tout de suite le code du gérant qui autorise une remise (l'accord est revérifié à la vente)
+  api.post('/discount/check', auth, need('pos.sell'), (req, res) => { const a = resolveApprover(ctx, req.body); res.json({ ok: true, name: a.name }); });
   api.post('/sales/sync', auth, need('sales.sync'), (req, res) => {
     if (!can(req.user.role, 'pos.sell')) throw forbidden();
-    res.json({ results: syncSales(ctx, actorOf(req.user), req.body?.sales) });
+    const results = syncSales(ctx, actorOf(req.user), req.body?.sales);
+    try { cashReminderTick(ctx); } catch { /* idem */ }
+    res.json({ results });
   });
   api.get('/sales', auth, (req, res) => {
     const all = can(req.user.role, 'sales.view_all');
@@ -160,13 +167,26 @@ export function registerPos({ api, ctx, auth, need, iso, actorOf }) {
   // ---------- caisse ----------
   api.get('/closure/preview', auth, need('closure.do'), (req, res) => {
     const pv = closurePreview(ctx.db);
-    res.json({ ...pv, today: today(), cashier: !can(req.user.role, 'sales.view_all') });
+    res.json(can(req.user.role, 'cash.review') ? { ...pv, today: today() } : blindPreview(pv));
   });
-  api.post('/closure', auth, need('closure.do'), (req, res) => res.status(201).json(closeCash(ctx, actorOf(req.user), req.body)));
-  api.get('/closures', auth, need('closure.do'), (req, res) => {
-    res.json({ items: ctx.db.prepare('SELECT * FROM closures ORDER BY id DESC LIMIT 60').all().map((c) => ({ ...c, by_method: JSON.parse(c.by_method) })) });
+  api.post('/closure', auth, need('closure.do'), (req, res) => res.status(201).json(closeCash(ctx, actorOf(req.user), req.body, req.user)));
+  api.get('/shift/current', auth, need('catalog.view'), (req, res) => {
+    const st = shiftStatus(ctx, req.user);
+    // le caissier apprend seulement « versez X € », jamais le total qu'il a en caisse
+    res.json({ ...st, deposit_due_cents: st.mine ? depositDue(ctx.db).due_cents : 0 });
   });
-  api.get('/closures/:id', auth, need('closure.do'), (req, res) => { const c = closureView(ctx.db, intId(req.params.id)); if (!c) throw notFound('Clôture introuvable.'); res.json(c); });
+  api.post('/shifts/open', auth, need('shift.open'), (req, res) => res.status(201).json(openShift(ctx, req.user, req.body)));
+  api.get('/shifts', auth, need('cash.review'), (req, res) => {
+    res.json({ items: ctx.db.prepare('SELECT id FROM shifts ORDER BY id DESC LIMIT 60').all().map((r) => shiftView(ctx.db, r.id)) });
+  });
+  api.get('/closures', auth, need('cash.review'), (req, res) => {
+    res.json({ items: ctx.db.prepare('SELECT id FROM closures ORDER BY id DESC LIMIT 60').all().map((c) => closureView(ctx.db, c.id)) });
+  });
+  api.get('/closures/:id', auth, need('cash.review'), (req, res) => { const c = closureView(ctx.db, intId(req.params.id)); if (!c) throw notFound('Clôture introuvable.'); res.json(c); });
+  api.post('/shift/deposit', auth, need('cash.deposit'), (req, res) => res.status(201).json(makeDeposit(ctx, req.user, req.body)));
+  api.post('/shift/request-deposit', auth, need('cash.review'), (req, res) => res.json(requestDeposit(ctx, req.user, req.body)));
+  api.get('/cash-review', auth, need('cash.review'), (req, res) => res.json(reviewOverview(ctx, req.query)));
+  api.post('/cash-review/:id', auth, need('cash.review'), (req, res) => res.status(201).json(validateClosure(ctx, req.user, intId(req.params.id), req.body)));
   api.post('/cash-moves', auth, need('cash.move'), (req, res) => res.status(201).json(cashMove(ctx, actorOf(req.user), req.body)));
 
   // ---------- clients ----------

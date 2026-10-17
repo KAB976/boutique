@@ -33,6 +33,9 @@ export default function Account({ me, forced, onPinChanged }) {
         {forced && <Notice tone="warn">Votre code est provisoire. Choisissez le vôtre pour continuer.</Notice>}
       </section>
       {!forced && <NotifyCard />}
+      {me.canChangePin === false ? (
+        <section className="card narrow-card"><h2>Mon code PIN</h2><p className="muted">Votre code est donné par l'administrateur. Pour le changer, demandez-lui.</p></section>
+      ) : (
       <section className="card narrow-card">
         <h2>Changer mon code PIN</h2>
         <ErrorBox error={error} />
@@ -42,6 +45,7 @@ export default function Account({ me, forced, onPinChanged }) {
         <PinPad value={value} onChange={(v) => { setDone(false); setValue(v); }} onSubmit={submit} disabled={busy} submitLabel={phase === 'confirm' ? 'Enregistrer' : 'Suivant'} />
         {phase !== 'current' && <button className="link" onClick={reset}>Recommencer</button>}
       </section>
+      )}
     </div>
   );
 }

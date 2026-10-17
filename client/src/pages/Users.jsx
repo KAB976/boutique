@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { Field, Modal, ErrorBox, Notice, useAsync } from '../ui.jsx';
 
-const ROLES = [['owner', 'Propriétaire'], ['manager', 'Gérant'], ['cashier', 'Caissier'], ['cook', 'Cuisinier']];
+const ROLES = [['owner', 'Propriétaire'], ['manager', 'Gérant'], ['cashier', 'Caissier'], ['cook', 'Cuisinier'], ['waiter', 'Serveur']];
 const ROLE_HELP = {
   owner: 'Tout : réglages, comptes, prix d\'achat, sauvegardes.',
   manager: 'Tout sauf réglages et comptes : recettes, stock, achats, promotions, clôtures, statistiques.',
@@ -33,7 +33,7 @@ function UserForm({ user, onClose, onSaved }) {
           <select value={role} onChange={(e) => setRole(e.target.value)}>{ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         </Field>
         {isNew && (
-          <Field label="Code PIN provisoire" hint="4 à 8 chiffres. La personne devra en choisir un nouveau à sa première connexion.">
+          <Field label="Code PIN" hint="4 à 8 chiffres. C'est vous qui le donnez à la personne ; elle ne peut pas le changer.">
             <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="off" />
           </Field>
         )}
@@ -52,7 +52,7 @@ function PinReset({ user, onClose, onSaved }) {
       <form onSubmit={submit}>
         <ErrorBox error={error} />
         <p className="muted">La personne sera déconnectée et devra choisir son propre code à la prochaine connexion. Un blocage éventuel est levé.</p>
-        <Field label="Code PIN provisoire"><input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="off" /></Field>
+        <Field label="Nouveau code PIN"><input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="off" /></Field>
         <div className="actions"><button type="button" onClick={onClose}>Annuler</button><button className="primary" disabled={busy}>Enregistrer</button></div>
       </form>
     </Modal>

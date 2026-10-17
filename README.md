@@ -144,3 +144,34 @@ Tests : `npm test`.
 - **Annulation** : le serveur peut annuler sa propre commande tant que la cuisine n'a pas commencé ; ensuite seulement le gérant / propriétaire, avec un motif (écrit dans le journal). Une commande déjà encaissée se corrige par un remboursement.
 - **Limites connues** : envoi de commande et additions nécessitent le réseau (la caisse hors-ligne reste possible pour les ventes directes). Les notifications dépendent du service de notification du téléphone (Google/Apple) et peuvent arriver avec du retard ; le plus fiable reste un téléphone/tablette de cuisine branché, écran allumé, sur l'onglet Commandes (cela évite aussi que le serveur gratuit de Render s'endorme). Un test de notification réel n'a pas pu être fait depuis l'environnement de développement : bouton « Envoyer un test » dans Mon compte.
 - Nouveaux droits : `orders.view` (tous), `orders.take` / `orders.serve` (propriétaire, gérant, caissier), `orders.kitchen` (propriétaire, gérant, cuisinier), `orders.cancel_any` (propriétaire, gérant).
+
+## Version 1.2 : quart de caisse et comptes gérés par l'administrateur
+
+- **Quart de caisse** : pour encaisser, il faut avoir ouvert son quart (Caisse → on compte le tiroir et on tape son code). Un seul quart peut être ouvert à la fois. Le caissier qui part ferme son quart (Ventes → « Fermer mon quart »), compte le tiroir, laisse un fond de caisse et tape son code. Le suivant ouvre le sien avec son propre code et vérifie le fond laissé ; en cas d'écart, une explication est obligatoire.
+- **Sorties / entrées d'espèces** : un motif (liste) et une note sont obligatoires. Elles sont reprises sur la clôture imprimée.
+- **Fermeture forcée** : le patron ou le gérant peut fermer le quart de quelqu'un d'absent (note obligatoire).
+- **Ventes hors ligne** : si elles sont rejouées après la fermeture, les espèces sont comptées à part (« espèces tardives »).
+- Réglage `Quart de caisse obligatoire` (1 par défaut).
+- **Comptes** : le nom et le code PIN de chaque employé sont créés par l'administrateur uniquement, sans code provisoire, et l'employé ne peut pas le changer (réglage `self_pin_change`, 0 par défaut). L'administrateur peut redonner un code à tout moment.
+
+## Version 1.3 : fermeture « à l'aveugle », versements, vérification par l'administrateur
+
+- **Le caissier ne voit aucun total** (ventes, espèces, carte, montant attendu, écart). À la fermeture il compte le tiroir, indique le **fond de caisse laissé** et **l'argent versé** (tout le reste), tape son code. Il n'a pas à expliquer d'écart : il ne le connaît pas.
+- **Versements en cours de quart** : quand l'administrateur le demande (ou de lui-même), le caissier retire des espèces et saisit seulement le montant : « Versement 1 », « Versement 2 »… Ils sont enregistrés, datés, numérotés par quart, et déduits de l'attendu.
+- **Onglet « Vérif. caisses »** (propriétaire et gérant) : 
+  - *Caisse en cours* : espèces attendues dans le tiroir en ce moment, ventes espèces/carte, versements déjà faits, alerte au-delà du seuil (réglage « Seuil d’espèces », 300 € par défaut) et bouton **Demander un versement** (le caissier voit un bandeau, et une notification s'il les a activées).
+  - *Par jour* : chaque quart avec attendu, compté, écart, total versé, et le total du jour. **Valider cette caisse** (note obligatoire s'il y a un écart). Une validation ne se modifie plus et est écrite au journal. Un gérant ne valide pas sa propre caisse : le propriétaire le fait.
+- Le gérant ou le propriétaire qui ferme un quart voit l'écart et doit l'expliquer (comme avant).
+- Les clôtures passées et le détail des ventes par jour ne sont plus accessibles au caissier. Sa liste « Mes ventes » n'affiche plus les montants.
+- Comptes : nom et code PIN créés par l'administrateur uniquement (réglage `self_pin_change`, 0 par défaut).
+- **Seuil automatique** : quand les espèces du tiroir (hors fond de caisse du départ) dépassent le seuil réglé, le caissier reçoit tout de suite un bandeau et une notification « versez <seuil> € » (sans voir aucun total), puis un rappel toutes les 10 minutes tant qu'il n'a pas versé. La caisse n'est jamais bloquée. Seuil à 0 = désactivé.
+
+## Version 1.4 : commandes depuis chaque téléphone, rôle Serveur, additions et ardoise
+
+- **Commandes depuis n'importe quel téléphone** : onglet « Commandes » → « ＋ Nouvelle commande » (menu, quantités, remarque par article, table ou nom du client). La commande part tout de suite en cuisine (son + notification), sans passer par la caisse et **sans quart ouvert**. Elle reste utilisable depuis la Caisse comme avant.
+- **Nouveau rôle « Serveur »** (créé par le propriétaire dans Comptes) : prend et sert les commandes, voit le menu, rien d'autre (ni caisse, ni espèces, ni clients, ni clôtures). Un caissier ou un gérant peut aussi prendre des commandes de son téléphone.
+- **Le paiement se fait uniquement à la caisse** : « Additions ouvertes », chercher par numéro de table ou nom du client, voir le total, encaisser.
+- **Clients à crédit (ardoise)** : si le nom de l'addition est celui d'un client enregistré (un seul), la caisse montre son ardoise et sa limite, et le sélectionne automatiquement : on peut payer l'addition en espèces/carte ou la mettre sur son ardoise (limite fixée par le gérant). Les règlements se font dans « Clients », avec relevé de compte imprimable.
+- Mise à jour d'une base existante : la migration 13 autorise le rôle Serveur sans toucher aux données.
+- **Plusieurs additions d'un coup** (v1.4.1) : dans « Additions ouvertes », cochez « Regrouper » sur Table 4, Table 1… puis « Encaisser le tout » : une seule vente. Choisissez le client, puis « 📒 Tout mettre sur l'ardoise du client ». La limite d'ardoise est vérifiée ; si elle est dépassée, rien n'est enregistré et les additions restent ouvertes.
+- **Remise spéciale autorisée par le gérant** (v1.4.2) : seul le gérant ou le propriétaire peut accorder une remise libre. Le caissier touche « Remise (accord gérant) », saisit le montant et le motif, et le gérant choisit son nom et tape SON code sur cet appareil. Le code est vérifié tout de suite (5 erreurs = blocage 60 s). La vente enregistre qui a demandé (le caissier), qui a autorisé (le gérant) et le motif ; c'est dans le journal et dans le détail de la vente. Impossible sans réseau.

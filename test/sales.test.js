@@ -17,7 +17,7 @@ test('migration 5/6 : ventes, lignes, paiements, clôtures, compte client en lec
     }
     assert.ok(s.id);
     await w.sellOk(w.C, [{ product_id: w.cafe.id, qty: 1 }], cash(100));
-    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: 100, reason: 'test' }, w.C), 201);
+    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: 100, category: 'Monnaie / change', reason: 'test' }, w.C), 201);
     const cid = (await w.ok(w.t.api.post('/api/customers', { name: 'Zoé' }, w.C), 201)).id;
     await w.ok(w.t.api.put(`/api/customers/${cid}`, { credit_limit_cents: 1000 }, w.M));
     await w.sellOk(w.C, [{ product_id: w.cafe.id, qty: 1 }], [{ method: 'credit', amount_cents: 100 }], { customer_id: cid });
@@ -79,7 +79,7 @@ test('paiement : incomplet refusé, mixte espèces + carte, dépassement hors es
     const mixed = await w.sellOk(w.C, L, [{ method: 'card', amount_cents: 250 }, { method: 'cash', amount_cents: 200 }]);
     assert.equal(mixed.change_cents, 50);
     assert.deepEqual(mixed.payments.map((p) => [p.method, p.amount_cents]), [['card', 250], ['cash', 150]]);
-    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.C));
+    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.M));
     assert.equal(pv.by_method.cash, 150);
     assert.equal(pv.cash_expected_cents, 150);
   } finally { await w.t.close(); }
@@ -203,7 +203,7 @@ test('annulation (avoir) : stock rendu, paiements inversés, une seule fois, dro
     assert.equal((await w.t.api.post(`/api/sales/${r.id}/refund`, { reason: 'x' }, w.M)).status, 400, 'on n’annule pas une annulation');
     const orig = await w.ok(w.t.api.get(`/api/sales/${s.id}`, w.C));
     assert.equal(orig.refunded_by.number, r.number);
-    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.C));
+    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.M));
     assert.equal(pv.sales_cents - pv.refunds_cents, 0);
     assert.equal(pv.cash_expected_cents, 0, 'la caisse revient à zéro');
     assert.equal(verifyJournal(w.t.ctx.db).ok, true);
@@ -243,31 +243,31 @@ test('clôture : attendu, écart (note obligatoire), fond de caisse, dépôt, p�
     assert.equal((await w.t.api.post('/api/closure', { counted_cents: 0 }, w.C)).status, 409, 'rien à clôturer');
     await w.sellOk(w.C, [{ product_id: w.minute.id, qty: 1 }], cash(500));   // 4,00 espèces
     await w.sellOk(w.C, [{ product_id: w.minute.id, qty: 1 }], [{ method: 'card', amount_cents: 400 }]);
-    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: 5000, reason: 'Fond de caisse du matin' }, w.C), 201);
-    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: -250, reason: 'Achat de pain' }, w.C), 201);
-    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 100, reason: 'x' }, w.K)).status, 403);
-    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 0, reason: 'x' }, w.C)).status, 400);
-    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 100 }, w.C)).status, 400);
-    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.C));
+    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: 5000, category: 'Ajout de fond de caisse', reason: 'Fond de caisse du matin' }, w.C), 201);
+    await w.ok(w.t.api.post('/api/cash-moves', { amount_cents: -250, category: 'Achat de marchandises', reason: 'Achat de pain' }, w.C), 201);
+    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 100, category: 'Autre', reason: 'xyz' }, w.K)).status, 403);
+    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 0, category: 'Autre', reason: 'xyz' }, w.C)).status, 400);
+    assert.equal((await w.t.api.post('/api/cash-moves', { amount_cents: 100, category: 'Autre' }, w.C)).status, 400);
+    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.M));
     assert.equal(pv.cash_expected_cents, 5000 + 400 - 250);
     assert.equal(pv.sales_cents, 800);
     assert.equal(pv.by_method.card, 400);
-    const no = await w.t.api.post('/api/closure', { counted_cents: 5100, float_out_cents: 5000 }, w.C);
-    assert.equal(no.status, 400); assert.equal(no.data.error.code, 'variance_note');
     assert.equal((await w.t.api.post('/api/closure', { counted_cents: 1000, float_out_cents: 2000, note: 'x' }, w.C)).status, 400, 'fond > comptage');
-    const z = await w.ok(w.t.api.post('/api/closure', { counted_cents: 5100, float_out_cents: 5000, note: 'Il manque 0,50 € : rendu de monnaie' }, w.C), 201);
-    assert.equal(z.variance_cents, -50);
-    assert.equal(z.deposit_cents, 100);
-    assert.equal(z.number, 'Z-0001');
+    // le caissier ferme à l'aveugle : pas de note exigée, aucun total ni écart dans la réponse
+    const z = await w.ok(w.t.api.post('/api/closure', { counted_cents: 5100, float_out_cents: 5000 }, w.C), 201);
+    assert.equal(z.blind, true); assert.equal(z.deposit_cents, 100); assert.equal(z.number, 'Z-0001');
+    for (const k of ['variance_cents', 'cash_expected_cents', 'sales_cents', 'by_method']) assert.equal(k in z, false, `${k} ne doit pas être visible du caissier`);
+    const det = (await w.ok(w.t.api.get('/api/closures', w.M))).items[0];
+    assert.equal(det.variance_cents, -50);
     // période suivante : le fond laissé est le point de départ
-    const pv2 = await w.ok(w.t.api.get('/api/closure/preview', w.C));
+    const pv2 = await w.ok(w.t.api.get('/api/closure/preview', w.M));
     assert.equal(pv2.empty, true);
     assert.equal(pv2.float_in_cents, 5000);
     assert.equal(pv2.cash_expected_cents, 5000);
     await w.sellOk(w.C, [{ product_id: w.minute.id, qty: 1 }], cash(400));
     const z2 = await w.ok(w.t.api.post('/api/closure', { counted_cents: 5400, float_out_cents: 5000 }, w.C), 201);
-    assert.equal(z2.variance_cents, 0); assert.equal(z2.number, 'Z-0002');
-    assert.equal(z2.sales_count, 1, 'la période ne reprend pas les ventes déjà clôturées');
+    assert.equal(z2.number, 'Z-0002');
+    assert.equal((await w.ok(w.t.api.get('/api/closures', w.M))).items[0].sales_count, 1, 'la période ne reprend pas les ventes déjà clôturées');
     const list = await w.ok(w.t.api.get('/api/closures', w.M));
     assert.equal(list.items.length, 2);
   } finally { await w.t.close(); }
@@ -325,7 +325,7 @@ test('ardoise : limite fixée par le gérant, plafond respecté, règlement en e
     await w.ok(w.t.api.post(`/api/customers/${cid}/payments`, { amount_cents: 400, method: 'transfer' }, w.C), 201);
     c = await w.ok(w.t.api.get(`/api/customers/${cid}`, w.C));
     assert.equal(c.balance_cents, 0);
-    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.C));
+    const pv = await w.ok(w.t.api.get('/api/closure/preview', w.M));
     assert.equal(pv.cash_expected_cents, 200 + 600, 'espèces de la vente mixte + règlement en espèces (pas le virement)');
     assert.equal(pv.by_method.credit, 1000);
     assert.equal((await w.t.api.put(`/api/customers/${cid}`, { active: false }, w.M)).status, 200);

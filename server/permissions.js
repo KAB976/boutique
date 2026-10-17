@@ -3,8 +3,8 @@
  * l'interface ne fait que l'afficher.
  * Les droits des étapes suivantes sont déjà listés pour que les rôles restent cohérents.
  */
-export const ROLES = ['owner', 'manager', 'cashier', 'cook'];
-export const ROLE_LABELS = { owner: 'Propriétaire', manager: 'Gérant', cashier: 'Caissier', cook: 'Cuisinier' };
+export const ROLES = ['owner', 'manager', 'cashier', 'cook', 'waiter'];
+export const ROLE_LABELS = { owner: 'Propriétaire', manager: 'Gérant', cashier: 'Caissier', cook: 'Cuisinier', waiter: 'Serveur' };
 
 const ALL = ROLES;
 export const PERMISSIONS = {
@@ -49,10 +49,16 @@ export const PERMISSIONS = {
   'expenses.manage':    ['owner', 'manager'],
   'production.void':    ['owner', 'manager'],
   'sales.sync':         ['owner', 'manager', 'cashier'],
+  // version 1.2 : quarts de caisse
+  'shift.open':         ['owner', 'manager', 'cashier'],
+  'shift.force_close':  ['owner', 'manager'],
+  // version 1.3 : le caissier ferme « à l'aveugle », l'administrateur vérifie
+  'cash.review':        ['owner', 'manager'],
+  'cash.deposit':       ['owner', 'manager', 'cashier'],
   // version 1.1 : commandes envoyées à la cuisine
   'orders.view':        ALL,
-  'orders.take':        ['owner', 'manager', 'cashier'],
-  'orders.serve':       ['owner', 'manager', 'cashier'],
+  'orders.take':        ['owner', 'manager', 'cashier', 'waiter'],
+  'orders.serve':       ['owner', 'manager', 'cashier', 'waiter'],
   'orders.kitchen':     ['owner', 'manager', 'cook'],
   'orders.cancel_any':  ['owner', 'manager'],
 };

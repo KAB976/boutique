@@ -5,6 +5,7 @@ import { eur } from '../money.js';
 import { useBoard, refreshBoard, useAudioReady } from '../board.js';
 import { unlockAudio, playSound } from '../alerts.js';
 import NotifyCard from './Notify.jsx';
+import OrderTake from './OrderTake.jsx';
 
 const mins = (iso, now) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
 const hhmm = (iso, tz) => { try { return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }); } catch { return ''; } };
@@ -48,6 +49,7 @@ export default function Orders({ me }) {
   const ready = useAudioReady();
   const [now, setNow] = useState(Date.now());
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [taking, setTaking] = useState(false); const [sentMsg, setSentMsg] = useState('');
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t); }, []);
   useEffect(() => { refreshBoard(); }, []);
   const perms = me.permissions;
@@ -78,9 +80,12 @@ export default function Orders({ me }) {
     <div className="stack">
       {!ready && <button className="banner off" style={{ width: '100%', textAlign: 'left' }} onClick={() => { unlockAudio(); setTimeout(() => playSound('ready'), 150); }}><span><strong>🔇 Touchez ici pour activer le son</strong> (le navigateur l'exige après chaque ouverture).</span></button>}
       {b.offline && <div className="banner off"><span><strong>Pas de réseau.</strong> Les commandes ne s'actualisent plus : vérifiez la connexion.</span><button onClick={refreshBoard}>Réessayer</button></div>}
+      {can.take && <button className="primary big" style={{ width: '100%', minHeight: 56 }} onClick={() => { setSentMsg(''); setTaking(true); }}>＋ Nouvelle commande</button>}
+      {sentMsg && <div className="banner ok"><span>{sentMsg}</span><button className="link" onClick={() => setSentMsg('')}>OK</button></div>}
+      {taking && <OrderTake onClose={() => setTaking(false)} onSent={setSentMsg} />}
       <ErrorBox error={err || b.error} />
       {!data && !b.offline && <p className="muted">Chargement des commandes…</p>}
-      {data && act.length === 0 && <section className="card empty-board"><h2>Aucune commande en cours</h2><p className="muted">{can.take ? 'Prenez une commande depuis la Caisse : « Envoyer en cuisine ».' : 'Les nouvelles commandes apparaissent ici toutes seules, avec un son.'}</p></section>}
+      {data && act.length === 0 && <section className="card empty-board"><h2>Aucune commande en cours</h2><p className="muted">{can.take ? 'Touchez « Nouvelle commande » : elle part tout de suite en cuisine, depuis votre téléphone ou la caisse.' : 'Les nouvelles commandes apparaissent ici toutes seules, avec un son.'}</p></section>}
       {data && (
         <div className={`board cols-${cols.length}`}>
           {cols.map(([k, title, list]) => (

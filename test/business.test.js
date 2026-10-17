@@ -198,7 +198,7 @@ test('droits : matrice des routes des étapes 4 à 9', async () => {
       ['get', '/api/batches', 200, 200, 403, 200],
       ['get', '/api/sales', 200, 200, 200, 403],
       ['get', '/api/closure/preview', 200, 200, 200, 403],
-      ['get', '/api/closures', 200, 200, 200, 403],
+      ['get', '/api/closures', 200, 200, 403, 403],
       ['get', '/api/customers', 200, 200, 200, 403],
       ['get', '/api/promotions', 200, 200, 403, 403],
       ['get', '/api/suppliers', 200, 200, 403, 403],

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { createPortal } from 'react-dom';
 import { Modal, Field, ErrorBox, Notice, useAsync } from '../ui.jsx';
+import { cache } from '../offline.js';
 import { eur, eurSigned, parseEuros, toEuroInput, fmtDT } from '../money.js';
 
 const PAY = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
@@ -29,6 +31,18 @@ function CustomerForm({ c, can, onClose, onSaved }) {
       <div className="actions"><button onClick={onClose}>Annuler</button><button className="primary" disabled={busy || !f.name.trim()} onClick={save}>Enregistrer</button></div>
     </Modal>
   );
+}
+
+function Statement({ d, shop, tz }) {
+  return createPortal(
+    <div className="print-sheet">
+      <h1>{shop?.shop_name} — Relevé de compte</h1>
+      <p><strong>{d.name}</strong>{d.phone ? ` · ${d.phone}` : ''} · édité le {fmtDT(new Date().toISOString(), tz)}</p>
+      <table><tbody>
+        {d.ledger.slice().reverse().map((l) => <tr key={l.id}><td>{fmtDT(l.ts, tz)}</td><td>{{ sale: `Vente ${l.sale_number ?? ''}`, refund: `Annulation ${l.note ?? ''}`, payment: `Règlement (${PAY[l.method] ?? l.method})`, adjust: `Correction : ${l.note ?? ''}` }[l.type]}</td><td>{eurSigned(l.amount_cents)}</td></tr>)}
+      </tbody></table>
+      <h2>Reste à régler : {eur(d.balance_cents)}</h2>
+    </div>, document.body);
 }
 
 function Detail({ id, can, loyalty, tz, onClose, onChanged, onEdit }) {
@@ -94,7 +108,9 @@ function Detail({ id, can, loyalty, tz, onClose, onChanged, onEdit }) {
             <details><summary>Historique des tampons</summary>
               <table><tbody>{d.stamps_log.map((m) => <tr key={m.id}><td>{fmtDT(m.ts, tz)}</td><td>{m.reason}</td><td>{m.delta > 0 ? `+${m.delta}` : m.delta}</td></tr>)}</tbody></table></details>
           )}
+          <Statement d={d} shop={cache.get('ticket')} tz={tz} />
           <div className="actions">
+            <button onClick={() => window.print()}>🖨 Relevé</button>
             {can.edit && <button onClick={() => onEdit(d)}>Modifier</button>}
             {can.credit && <button onClick={adjust} disabled={busy}>Corriger l'ardoise</button>}
             {can.credit && loyalty?.enabled && <button onClick={stamps} disabled={busy}>Ajuster les tampons</button>}

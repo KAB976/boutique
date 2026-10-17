@@ -17,7 +17,7 @@ export const METHODS = { cash: 'Espèces', card: 'Carte', voucher: 'Bon / ticket
 export const FLAG_TEXT = {
   offline: 'faite hors-ligne', stock_negative: 'stock insuffisant au moment de la vente', cost_unknown: 'coût inconnu', recipe_incomplete: 'recette incomplète',
   product_inactive: 'article retiré de la vente depuis', price_differs: 'prix différent du catalogue', ts_future: 'heure de l’appareil incorrecte', ts_old: 'vente très ancienne',
-  over_limit: 'limite d’ardoise dépassée', refund: 'annulation', after_closure: 'annulation après clôture', no_restock: 'marchandise non remise en stock', offline_gap: 'écart de prix hors-ligne absorbé',
+  over_limit: 'limite d’ardoise dépassée', refund: 'annulation', after_closure: 'annulation après clôture', no_restock: 'marchandise non remise en stock', offline_gap: 'écart de prix hors-ligne absorbé', no_shift: 'reçue sans quart ouvert (faite hors-ligne)',
 };
 let CURRENT_TZ;
 /** Fuseau du commerce, fixé une fois connecté : les journées se découpent à son heure, pas à celle de l'appareil. */

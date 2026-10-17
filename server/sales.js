@@ -1,4 +1,5 @@
 import { linkOrdersToSale } from './orders.js';
+import { assertSeller, assertDrawer, shiftRequired, currentShift, confirmPin, shiftView, CASH_OUT_REASONS, CASH_IN_REASONS, refCategory, DEPOSIT, depositsOf } from './shifts.js';
 import { tx } from './db.js';
 import { bad, notFound, conflict, forbidden } from './errors.js';
 import { writeAudit } from './audit.js';
@@ -86,9 +87,26 @@ function whenOf(ctx, body, flags) {
   return new Date(t);
 }
 
+/** Qui autorise la remise libre : le gérant/propriétaire lui-même, ou quelqu'un d'autre qui tape SON code sur cet appareil. */
+export function resolveApprover(ctx, approval) {
+  if (!approval) throw forbidden('Seul le gérant peut accorder une remise libre : il doit l’autoriser en tapant son code.');
+  const id = approval?.user_id;  const u = Number.isInteger(id) ? ctx.db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(id) : null;
+  if (!u) throw bad('Choisissez qui autorise la remise.', 'approver_required');
+  if (!can(u.role, 'promotions.manage')) throw forbidden(`${u.name} n’a pas le droit d’accorder une remise.`);
+  confirmPin(ctx, u, approval?.pin); // mêmes blocages qu'à la connexion (5 erreurs = 60 s)
+  return { id: u.id, name: u.name, role: u.role };
+}
+
 export function createSale(ctx, actor, body) {
   const db = ctx.db;
   const b = body || {};
+  // la remise libre est décidée AVANT la vente (une erreur de code ne doit pas être annulée avec elle)
+  let approver = null;
+  if (b.discount_cents !== undefined && b.discount_cents !== null && b.discount_cents !== 0) {
+    if (can(actor?.role, 'promotions.manage')) approver = { id: actor.id, name: actor.name };
+    else if (b.offline) throw forbidden('Une remise libre exige l’accord du gérant, qui doit taper son code : impossible sans réseau.');
+    else approver = resolveApprover(ctx, b.discount_approval);
+  }
   if (typeof b.client_uuid !== 'string' || !UUID_RE.test(b.client_uuid)) throw bad('Identifiant de vente manquant (rechargez la page).');
   const dup = db.prepare('SELECT id FROM sales WHERE client_uuid = ?').get(b.client_uuid);
   if (dup) return { duplicate: true, sale: saleView(db, dup.id) };
@@ -100,6 +118,8 @@ export function createSale(ctx, actor, body) {
   return tx(db, () => {
     const flags = new Set();
     if (offline) flags.add('offline');
+    if (!offline) assertSeller(ctx, actor); // quart de caisse ouvert par cette personne
+    else if (shiftRequired(db) && currentShift(db)?.user_id !== actor?.id) flags.add('no_shift'); // déjà encaissé physiquement : on enregistre, on signale
     const when = whenOf(ctx, b, flags);
     const ts = when.toISOString();
     const day = dayIn(when, tz);
@@ -142,7 +162,6 @@ export function createSale(ctx, actor, body) {
     }
     let manual = 0;
     if (b.discount_cents !== undefined && b.discount_cents !== null && b.discount_cents !== 0) {
-      if (!can(actor?.role, 'promotions.manage')) throw forbidden('Seul le gérant peut accorder une remise libre.');
       manual = cents(b.discount_cents, 'Remise', { min: 0 });
       if (!text(b.discount_reason ?? '', 'Motif de la remise', { max: 200 })) throw bad('Indiquez le motif de la remise.');
       if (manual > subtotalAfter - rewardCents) throw bad('La remise dépasse le total.');
@@ -197,10 +216,10 @@ export function createSale(ctx, actor, body) {
     const vatTotal = lineTotals.reduce((a, v, i) => a + vatOf(v, priced[i].p.vat_pct), 0);
     const note = text(b.note ?? '', 'Note', { max: 200 });
     const r = db.prepare(`INSERT INTO sales (number, kind, client_uuid, provisional, ts, day, received_at, offline, user_id, user_name, customer_id, refund_of,
-      void_reason, subtotal_cents, discount_cents, total_cents, vat_cents, cost, change_cents, note, flags)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,?,?,?,?,?,?)`).run(
+      void_reason, subtotal_cents, discount_cents, total_cents, vat_cents, cost, change_cents, note, flags, discount_reason, discount_by_name)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,?,?,?,?,?,?,?,?,?,?)`).run(
       number_, 'sale', b.client_uuid, typeof b.provisional === 'string' ? b.provisional.slice(0, 40) : null, ts, day, ctx.now().toISOString(), offline ? 1 : 0,
-      actor?.id ?? null, actor?.name ?? null, customer?.id ?? null, subtotal, subtotal - total, total, vatTotal, costTotal, change, note, JSON.stringify([...flags]));
+      actor?.id ?? null, actor?.name ?? null, customer?.id ?? null, subtotal, subtotal - total, total, vatTotal, costTotal, change, note, JSON.stringify([...flags]), manual > 0 ? text(b.discount_reason, 'Motif', { max: 200 }) : '', manual > 0 ? approver.name : '');
     const sid = Number(r.lastInsertRowid);
     const insL = db.prepare(`INSERT INTO sale_lines (sale_id, pos, product_id, name, qty, unit_price_cents, gross_cents, discount_cents, total_cents, vat_pct, cost, promo_label)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
@@ -221,7 +240,7 @@ export function createSale(ctx, actor, body) {
       if (earned > 0) db.prepare('INSERT INTO loyalty_moves (customer_id, ts, delta, sale_id, reason, user_name) VALUES (?,?,?,?,?,?)').run(customer.id, ts, earned, sid, 'Achat', actor?.name ?? null);
     }
     linkOrdersToSale(db, sid, b.order_ids);
-    if (manual > 0) writeAudit(db, ts, actor, 'sale.discount', { entity: 'sale', entityId: sid, detail: { number: number_, discount_cents: manual, reason: text(b.discount_reason, 'Motif', { max: 200 }) } });
+    if (manual > 0) writeAudit(db, ts, actor, 'sale.discount', { entity: 'sale', entityId: sid, detail: { number: number_, discount_cents: manual, reason: text(b.discount_reason, 'Motif', { max: 200 }), authorized_by: approver.name, requested_by: actor?.name } });
     return { duplicate: false, sale: saleView(db, sid) };
   });
 }
@@ -249,6 +268,7 @@ export function refundSale(ctx, actor, saleId, body) {
   const reason = text(body?.reason, 'Motif', { max: 200, min: 1 });
   const restock = body?.restock !== false;
   return tx(db, () => {
+    assertDrawer(db, actor);
     const s = db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
     if (!s) throw notFound('Vente introuvable.');
     if (s.kind !== 'sale') throw bad('Cette pièce est déjà une annulation.');
@@ -307,17 +327,22 @@ export function refundSale(ctx, actor, saleId, body) {
 export function cashMove(ctx, actor, body) {
   const amount = cents(body?.amount_cents, 'Montant', { min: -100_000_000 });
   if (amount === 0) throw bad('Le montant ne peut pas être zéro.');
-  const reason = text(body?.reason, 'Motif', { max: 200, min: 1 });
+  const category = text(body?.category ?? '', 'Motif', { max: 60 });
+  if (!(amount < 0 ? CASH_OUT_REASONS : CASH_IN_REASONS).includes(category)) throw bad(`Choisissez le motif ${amount < 0 ? 'de la sortie' : 'de l’entrée'} dans la liste.`, 'category_required');
+  const note = text(body?.reason ?? '', 'Note', { max: 200 });
+  if (note.length < 3) throw bad('La note est obligatoire : expliquez à quoi sert cet argent (3 lettres au moins).', 'note_required');
   const ts = ctx.now().toISOString();
   return tx(ctx.db, () => {
-    const r = ctx.db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, user_id, user_name) VALUES (?,?,?,?,?,?)').run(ts, dayIn(ctx.now(), ctx.tz()), amount, reason, actor?.id ?? null, actor?.name ?? null);
-    writeAudit(ctx.db, ts, actor, 'cash.move', { entity: 'cash', entityId: Number(r.lastInsertRowid), detail: { amount_cents: amount, reason } });
+    const shift = assertDrawer(ctx.db, actor);
+    const r = ctx.db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, category, user_id, user_name) VALUES (?,?,?,?,?,?,?)').run(ts, dayIn(ctx.now(), ctx.tz()), amount, note, category, actor?.id ?? null, actor?.name ?? null);
+    writeAudit(ctx.db, ts, actor, 'cash.move', { entity: 'cash', entityId: Number(r.lastInsertRowid), detail: { amount_cents: amount, category, note, shift: shift?.number } });
     return { id: Number(r.lastInsertRowid) };
   });
 }
 
-export function closurePreview(db) {
+export function closurePreview(db, tz) {
   const last = lastClosure(db);
+  const shift = currentShift(db);
   const fromSale = last?.to_sale_id ?? 0, fromMove = last?.to_cash_move_id ?? 0;
   const sales = db.prepare('SELECT * FROM sales WHERE id > ? ORDER BY id').all(fromSale);
   const moves = db.prepare('SELECT * FROM cash_moves WHERE id > ? ORDER BY id').all(fromMove);
@@ -325,55 +350,90 @@ export function closurePreview(db) {
   for (const r of db.prepare('SELECT p.method, SUM(p.amount_cents) AS s FROM payments p JOIN sales x ON x.id = p.sale_id WHERE x.id > ? GROUP BY p.method').all(fromSale)) byMethod[r.method] = r.s;
   const sold = sales.filter((x) => x.kind === 'sale'), refunds = sales.filter((x) => x.kind === 'refund');
   const sum = (a, k) => a.reduce((t, x) => t + x[k], 0);
-  const floatIn = last?.float_out_cents ?? 0;
+  const floatIn = shift ? shift.opening_counted_cents : (last?.float_out_cents ?? 0);
+  // ventes faites sans réseau AVANT l'ouverture du quart et arrivées après : leur argent était dans le tiroir du quart précédent
+  const lateCash = shift ? db.prepare(`SELECT COALESCE(SUM(p.amount_cents), 0) AS s FROM payments p JOIN sales x ON x.id = p.sale_id WHERE x.id > ? AND x.offline = 1 AND x.ts < ? AND p.method = 'cash'`).get(fromSale, shift.opened_at).s : 0;
   const cashNet = byMethod.cash ?? 0;
   const movesSum = sum(moves, 'amount_cents');
   const byProduct = db.prepare(`SELECT l.name, SUM(l.qty) AS qty, SUM(l.total_cents) AS cents FROM sale_lines l JOIN sales x ON x.id = l.sale_id WHERE x.id > ? GROUP BY l.product_id, l.name ORDER BY cents DESC`).all(fromSale);
   return {
     last: last ? { number: last.number, ts: last.ts } : null,
+    shift: shift ? shiftView(db, shift.id) : null,
     to_sale_id: sales.length ? sales[sales.length - 1].id : fromSale,
     to_cash_move_id: moves.length ? moves[moves.length - 1].id : fromMove,
     sales_count: sold.length, refunds_count: refunds.length,
     sales_cents: sum(sold, 'total_cents'), refunds_cents: -sum(refunds, 'total_cents'),
     discount_cents: sum(sold, 'discount_cents') + sum(refunds, 'discount_cents'), vat_cents: sum(sales, 'vat_cents'),
     offline_count: sold.filter((x) => x.offline).length,
-    by_method: byMethod, float_in_cents: floatIn, cash_moves: moves.map((m) => ({ ts: m.ts, amount_cents: m.amount_cents, reason: m.reason, user_name: m.user_name })),
-    cash_moves_cents: movesSum, cash_expected_cents: floatIn + cashNet + movesSum, by_product: byProduct,
-    empty: !sales.length && !moves.length,
+    by_method: byMethod, float_in_cents: floatIn, late_cash_cents: lateCash,
+    cash_moves: moves.map((m) => ({ ts: m.ts, amount_cents: m.amount_cents, reason: m.reason, category: refCategory(m), user_name: m.user_name })),
+    deposits: depositsOf(db, shift), deposits_cents: shift ? depositsOf(db, shift).reduce((t, d) => t + d.amount_cents, 0) : 0,
+    cash_moves_cents: movesSum, cash_expected_cents: floatIn + cashNet - lateCash + movesSum, by_product: byProduct,
+    empty: !shift && !sales.length && !moves.length,
   };
 }
 
-export function closeCash(ctx, actor, body) {
+/** Ce que voit un caissier : rien sur les ventes, les encaissements ni le montant attendu. */
+export function blindPreview(pv) {
+  const manual = new Set([...CASH_OUT_REASONS, ...CASH_IN_REASONS]);
+  return {
+    blind: true, last: pv.last, shift: pv.shift, empty: pv.empty,
+    deposits: pv.deposits,
+    cash_moves: pv.cash_moves.filter((m) => manual.has(m.category)),
+  };
+}
+
+export function closeCash(ctx, actor, body, user = null) {
   const db = ctx.db;
   const counted = cents(body?.counted_cents, 'Espèces comptées', { min: 0 });
   const floatOut = cents(body?.float_out_cents ?? 0, 'Fond de caisse laissé', { min: 0 });
   const note = text(body?.note ?? '', 'Note', { max: 300 });
   if (floatOut > counted) throw bad('Le fond de caisse laissé ne peut pas dépasser les espèces comptées.');
+  const shiftOpen = currentShift(db);
+  if (shiftOpen) {
+    if (!user) throw bad('Code PIN manquant.', 'pin_required');
+    confirmPin(ctx, user, body?.pin); // la personne qui ferme confirme avec SON code
+  } else if (shiftRequired(db)) throw conflict('Aucun quart de caisse n’est ouvert : il n’y a rien à fermer.', 'no_shift');
   return tx(db, () => {
+    const shift = currentShift(db);
+    let forced = false;
+    if (shift && shift.user_id !== actor?.id) {
+      if (!can(actor?.role, 'shift.force_close')) throw forbidden(`Seul ${shift.user_name} (ou le gérant) peut fermer ce quart.`);
+      if (note.length < 3) throw bad(`Vous fermez le quart de ${shift.user_name} à sa place : indiquez pourquoi dans la note.`, 'force_note');
+      forced = true;
+    }
     const pv = closurePreview(db);
     if (pv.empty) throw conflict('Rien à clôturer : aucune vente ni mouvement depuis la dernière clôture.', 'nothing');
     const variance = counted - pv.cash_expected_cents;
-    if (variance !== 0 && !note) throw bad('Il y a un écart de caisse : expliquez-le dans la note avant de clôturer.', 'variance_note');
+    // le caissier ne voit pas l'écart (il ne connaît pas le montant attendu) : c'est l'administrateur qui le vérifie ensuite
+    const sees = can(actor?.role, 'cash.review');
+    if (variance !== 0 && !note && sees) throw bad('Il y a un écart de caisse : expliquez-le dans la note avant de clôturer.', 'variance_note');
     const ts = ctx.now().toISOString();
     const day = dayIn(ctx.now(), ctx.tz());
     const number_ = nextNumber(db, 'closure', 'Z', { pad: 4 });
     let toMove = pv.to_cash_move_id;
     const deposit = counted - floatOut;
     if (deposit > 0) {
-      const r = db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, ref, user_id, user_name) VALUES (?,?,?,?,?,?,?)')
-        .run(ts, day, -deposit, `Dépôt à la clôture ${number_}`, number_, actor?.id ?? null, actor?.name ?? null);
+      const r = db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, category, ref, user_id, user_name) VALUES (?,?,?,?,?,?,?,?)')
+        .run(ts, day, -deposit, `Dépôt à la clôture ${number_}`, 'Dépôt à la clôture', number_, actor?.id ?? null, actor?.name ?? null);
       toMove = Number(r.lastInsertRowid);
     }
     const r = db.prepare(`INSERT INTO closures (number, ts, day, user_id, user_name, to_sale_id, to_cash_move_id, sales_count, refunds_count, sales_cents, refunds_cents, by_method,
-      float_in_cents, cash_expected_cents, cash_counted_cents, variance_cents, float_out_cents, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      float_in_cents, cash_expected_cents, cash_counted_cents, variance_cents, float_out_cents, note, shift_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       number_, ts, day, actor?.id ?? null, actor?.name ?? null, pv.to_sale_id, toMove, pv.sales_count, pv.refunds_count, pv.sales_cents, pv.refunds_cents, JSON.stringify(pv.by_method),
-      pv.float_in_cents, pv.cash_expected_cents, counted, variance, floatOut, note);
-    writeAudit(db, ts, actor, 'cash.closure', { entity: 'closure', entityId: Number(r.lastInsertRowid), detail: { number: number_, expected: pv.cash_expected_cents, counted, variance, deposit } });
-    return { ...pv, ...closureView(db, Number(r.lastInsertRowid)), deposit_cents: Math.max(0, deposit) };
+      pv.float_in_cents, pv.cash_expected_cents, counted, variance, floatOut, note, shift?.id ?? null);
+    const cid = Number(r.lastInsertRowid);
+    if (shift) db.prepare('UPDATE shifts SET closure_id = ?, closed_at = ?, closed_by_id = ?, closed_by_name = ?, forced = ? WHERE id = ?').run(cid, ts, actor?.id ?? null, actor?.name ?? null, forced ? 1 : 0, shift.id);
+    writeAudit(db, ts, actor, 'cash.closure', { entity: 'closure', entityId: cid, detail: { number: number_, shift: shift?.number, expected: pv.cash_expected_cents, counted, variance, deposit, float_left: floatOut, forced: forced || undefined, note: note || undefined } });
+    const full = { ...pv, ...closureView(db, cid), deposit_cents: Math.max(0, deposit) };
+    if (sees) return full;
+    return { blind: true, number: number_, shift: full.shift && { number: full.shift.number, user_name: full.shift.user_name }, deposit_cents: full.deposit_cents, float_out_cents: floatOut, cash_counted_cents: counted, ts };
   });
 }
 
 export const closureView = (db, id) => {
   const c = db.prepare('SELECT * FROM closures WHERE id = ?').get(id);
-  return c ? { ...c, by_method: JSON.parse(c.by_method) } : null;
+  if (!c) return null;
+  const sh = c.shift_id ? shiftView(db, c.shift_id) : null;
+  return { ...c, by_method: JSON.parse(c.by_method), shift: sh ? { number: sh.number, user_name: sh.user_name, opened_at: sh.opened_at, opening_counted_cents: sh.opening_counted_cents, opening_expected_cents: sh.opening_expected_cents, opening_variance_cents: sh.opening_variance_cents, opening_note: sh.opening_note, closed_by_name: sh.closed_by_name, forced: sh.forced } : null };
 };

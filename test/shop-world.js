@@ -15,6 +15,7 @@ export async function shop(opts) {
   const cashier = await t.staff(owner, 'Awa', 'cashier');
   const cashier2 = await t.staff(owner, 'Bao', 'cashier');
   const O = { token: owner }, M = { token: manager.token }, K = { token: cook.token }, C = { token: cashier.token }, C2 = { token: cashier2.token };
+  if (!opts?.shifts) { const r = await t.api.put('/api/settings', { require_shift: 0 }, { token: owner }); assert.equal(r.status, 200, JSON.stringify(r.data)); } // les tests de la caisse n'ouvrent pas de quart ; test/shifts.test.js couvre le quart
   const ok = async (p, status = 200) => { const r = await p; assert.equal(r.status, status, JSON.stringify(r.data)); return r.data; };
   const mk = (body) => ok(t.api.post('/api/ingredients', body, O), 201);
   const receive = (body) => ok(t.api.post('/api/stock/receipts', body, O), 201);

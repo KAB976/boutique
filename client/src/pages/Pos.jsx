@@ -5,6 +5,36 @@ import { applyPromos, atOf } from '../../../shared/promo.js';
 import { eur, parseEuros, toEuroInput, METHODS } from '../money.js';
 import { cache, newId, nextProvisional, enqueue, queue, failed, syncNow, onQueueChange, dismissFailed } from '../offline.js';
 import { TicketBody, PrintTicket } from './Ticket.jsx';
+import { useShift, loadShift } from '../shift.js';
+import { ShiftGate, ShiftBar, PinInput } from './Shift.jsx';
+
+/** Remise spéciale demandée par un caissier : le gérant ou le propriétaire l'autorise en tapant SON code sur cet appareil. */
+function ApproveDiscount({ onClose, onOk }) {
+  const [users, setUsers] = useState([]);
+  const [approver, setApprover] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [pin, setPin] = useState('');
+  const { busy, error, run } = useAsync();
+  useEffect(() => { api.get('/api/auth/users').then((u) => { const m = u.filter((x) => x.role === 'owner' || x.role === 'manager'); setUsers(m); if (m.length === 1) setApprover(String(m[0].id)); }).catch(() => {}); }, []);
+  const cents = parseEuros(amount);
+  const submit = () => run(async () => {
+    if (!(cents > 0)) throw new Error('Montant de la remise invalide.');
+    const r = await api.post('/api/discount/check', { user_id: Number(approver), pin });
+    onOk({ cents, reason: reason.trim(), approval: { user_id: Number(approver), pin }, by: r.name });
+  });
+  return (
+    <Modal title="Remise spéciale : accord du gérant" onClose={onClose}>
+      <p className="muted small">Seul le gérant ou le propriétaire peut accorder une remise. Il tape son code ici pour l'autoriser.</p>
+      <ErrorBox error={error} />
+      <Field label="Montant de la remise (€)"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" autoFocus /></Field>
+      <Field label="Motif (obligatoire)"><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Ex. client fidèle" /></Field>
+      <Field label="Qui autorise ?"><select value={approver} onChange={(e) => setApprover(e.target.value)}><option value="">— choisir —</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.roleLabel})</option>)}</select></Field>
+      {approver && <PinInput value={pin} onChange={setPin} label="Code PIN de cette personne" />}
+      <div className="actions"><button onClick={onClose} disabled={busy}>Annuler</button><button className="primary" disabled={busy || !approver || pin.length < 4 || reason.trim().length < 3 || !(cents > 0)} onClick={submit}>Autoriser la remise</button></div>
+    </Modal>
+  );
+}
 
 /** Reste à payer / rendu pour une liste de paiements (même règle que le serveur). */
 export function payState(total, payments) {
@@ -68,6 +98,7 @@ function PayModal({ total, customer, canCredit, onClose, onPay, busy, error }) {
             <button onClick={() => add(method, typed ?? remaining)} disabled={amount !== '' && typed == null}>Ajouter</button>
           </div>
           {method !== 'cash' && <div className="quick"><button className="primary" onClick={() => add(method, remaining)}>{METHODS[method]} : {eur(remaining)}</button></div>}
+          {canCredit && customer && method !== 'credit' && <div className="quick"><button onClick={() => add('credit', remaining)}>📒 Tout mettre sur l'ardoise du client : {eur(remaining)}</button></div>}
         </>
       )}
       {st.change > 0 && <div className="change-due">Rendre {eur(st.change)}</div>}
@@ -113,20 +144,32 @@ function TabsModal({ onClose, onPick }) {
   const [tabs, setTabs] = useState(null); const [err, setErr] = useState('');
   const load = useCallback(() => api.get('/api/orders/tabs').then((r) => setTabs(r.tabs)).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState([]);
   const SL = { sent: 'envoyée', preparing: 'en préparation', ready: 'prête', served: 'servie' };
+  const shown = tabs?.filter((t) => !q.trim() || t.label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <Modal title="Additions ouvertes" onClose={onClose} wide>
       <ErrorBox error={err} />
+      {tabs?.length > 0 && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher une table ou un client (ex. 4, Diallo)" aria-label="Chercher une addition" autoFocus />}
       {tabs === null && !err && <p className="muted">Chargement…</p>}
+      {tabs?.length > 0 && shown.length === 0 && <p className="muted">Aucune addition ne correspond.</p>}
       {tabs?.length === 0 && <p className="muted">Aucune addition en attente. Les commandes envoyées en cuisine sans paiement apparaissent ici jusqu'à leur règlement.</p>}
-      {tabs?.map((t) => (
+      {shown?.map((t) => (
         <div key={t.key} className="tab-line card">
           <div className="row-between"><strong>{t.label}</strong><strong>{eur(t.total_cents)}</strong></div>
           <p className="small">{t.lines.map((l) => `${l.qty} × ${l.name}`).join(', ')}</p>
           <p className="muted small">{t.order_ids.length} commande{t.order_ids.length > 1 ? 's' : ''} · {t.statuses.map((x) => SL[x]).join(', ')}</p>
-          <div className="actions"><button className="primary" onClick={() => onPick(t)}>Encaisser cette addition</button></div>
+          {t.customer && <p className="small">👤 Client enregistré : <strong>{t.customer.name}</strong> · ardoise actuelle <strong className={t.customer.balance_cents > 0 ? 'neg' : ''}>{eur(t.customer.balance_cents)}</strong>{t.customer.credit_limit_cents != null ? ` (limite ${eur(t.customer.credit_limit_cents)})` : ' (pas d\'ardoise autorisée)'}</p>}
+          <div className="actions">
+            <label className="check"><input type="checkbox" checked={sel.includes(t.key)} onChange={(e) => setSel((x) => (e.target.checked ? [...x, t.key] : x.filter((k) => k !== t.key)))} /> Regrouper</label>
+            <button className="primary" onClick={() => onPick([t])}>Encaisser cette addition</button>
+          </div>
         </div>
       ))}
+      {sel.length > 1 && (() => { const chosen = (tabs || []).filter((t) => sel.includes(t.key)); return (
+        <div className="banner ok"><span><strong>{chosen.length} additions regroupées</strong> ({chosen.map((t) => t.label).join(' + ')}) : {eur(chosen.reduce((a, t) => a + t.total_cents, 0))}</span><button className="primary" onClick={() => onPick(chosen)}>Encaisser le tout</button></div>
+      ); })()}
       <div className="actions"><button onClick={load}>Actualiser</button><button onClick={onClose}>Fermer</button></div>
     </Modal>
   );
@@ -153,7 +196,8 @@ function PendingModal({ onClose }) {
   );
 }
 
-export default function Pos({ me }) {
+export default function Pos({ me, go }) {
+  const sh = useShift(me);
   const [cat, setCat] = useState(() => cache.get('catalog'));
   const [offline, setOffline] = useState(false);
   const [loadErr, setLoadErr] = useState('');
@@ -170,6 +214,7 @@ export default function Pos({ me }) {
   const [syncMsg, setSyncMsg] = useState('');
   const [attached, setAttached] = useState(null); // { ids, label } : commandes déjà envoyées en cuisine, réglées par cette vente
   const [showSend, setShowSend] = useState(false);
+  const [showApprove, setShowApprove] = useState(false);
   const [showTabs, setShowTabs] = useState(false);
   const [sentMsg, setSentMsg] = useState('');
   const sendUuid = useRef(newId());
@@ -240,12 +285,19 @@ export default function Pos({ me }) {
     if (payNow) { setAttached({ ids: [r.order.id], label }); setShowPay(true); setSentMsg(`« ${label} » est envoyée en cuisine. Encaissez maintenant.`); }
     else { setSentMsg(`✓ « ${label} » envoyée en cuisine (${r.order.number}). L'addition reste ouverte.`); reset(); }
   });
-  const pickTab = (t) => {
+  const pickTab = (list) => {
     if (cart.length && !window.confirm('Remplacer le panier en cours par cette addition ?')) return;
-    const missing = t.lines.filter((l) => !byId.has(l.product_id));
-    if (missing.length) window.alert(`Ces articles ne sont plus en vente et ne seront pas dans le panier : ${missing.map((m) => m.name).join(', ')}. Vérifiez le total avant d'encaisser.`);
-    setCart(t.lines.filter((l) => byId.has(l.product_id)).map((l) => ({ product_id: l.product_id, qty: l.qty })));
-    setAttached({ ids: t.order_ids, label: t.label }); setCustomerId(''); setDiscount(null); setRedeem(false); setShowTabs(false); setError('');
+    const merged = new Map(); const missing = [];
+    for (const t of list) for (const l of t.lines) {
+      if (!byId.has(l.product_id)) { missing.push(l.name); continue; }
+      merged.set(l.product_id, (merged.get(l.product_id) || 0) + l.qty);
+    }
+    if (missing.length) window.alert(`Ces articles ne sont plus en vente et ne seront pas dans le panier : ${[...new Set(missing)].join(', ')}. Vérifiez le total avant d'encaisser.`);
+    setCart([...merged].map(([product_id, qty]) => ({ product_id, qty })));
+    const custs = [...new Set(list.map((t) => t.customer?.id).filter(Boolean))];
+    setAttached({ ids: list.flatMap((t) => t.order_ids), label: list.map((t) => t.label).join(' + ') });
+    setCustomerId(custs.length === 1 && cat?.customers?.some((c) => c.id === custs[0]) ? String(custs[0]) : '');
+    setDiscount(null); setRedeem(false); setShowTabs(false); setError('');
   };
 
   const askDiscount = () => {
@@ -266,7 +318,7 @@ export default function Pos({ me }) {
       ...(attached ? { order_ids: attached.ids } : {}),
       ...(customerId ? { customer_id: Number(customerId) } : {}),
       ...(calc.reward > 0 ? { redeem_loyalty: true } : {}),
-      ...(calc.manual > 0 ? { discount_cents: calc.manual, discount_reason: discount.reason } : {}),
+      ...(calc.manual > 0 ? { discount_cents: calc.manual, discount_reason: discount.reason, ...(discount.approval ? { discount_approval: discount.approval } : {}) } : {}),
     };
     try {
       const r = await api.post('/api/sales', payload);
@@ -274,6 +326,8 @@ export default function Pos({ me }) {
       reset(); setShowPay(false); load();
     } catch (e) {
       if (e.code === 'price_changed') { await load(); throw new Error(`${e.message} Le catalogue est à jour : vérifiez le panier.`); }
+      if (e.code === 'no_shift' || e.code === 'shift_other') { await loadShift(me); throw e; }
+      if (e.code === 'bad_pin' || e.code === 'locked' || e.code === 'approver_required') { setDiscount(null); throw new Error(`${e.message} La remise a été retirée : refaites-la autoriser.`); }
       if (e.code === 'order_paid' || e.code === 'order_cancelled') throw new Error(`${e.message} Touchez « Vider » puis rouvrez les additions.`);
       if (e.code !== 'network') throw e;
       if (attached) throw new Error('Pas de réseau : l’addition d’une table ne peut pas être encaissée hors-ligne. Réessayez quand le réseau revient.');
@@ -294,6 +348,8 @@ export default function Pos({ me }) {
     }
   });
 
+  const needShift = Boolean(sh?.required) && !sh?.mine;
+  if (sh === null || needShift) return <ShiftGate me={me} sh={sh} go={go} />;
   if (!cat) return <section className="card">{loadErr ? <ErrorBox error={loadErr} /> : <p className="muted">Chargement de la caisse…</p>}</section>;
 
   const cartPanel = (
@@ -331,10 +387,10 @@ export default function Pos({ me }) {
           <div className="row-between small"><span>Sous-total</span><span>{eur(calc.subtotal)}</span></div>
           {calc.promo.total > 0 && <div className="row-between small pos-amount"><span>Promotions</span><span>−{eur(calc.promo.total)}</span></div>}
           {calc.reward > 0 && <div className="row-between small pos-amount"><span>Fidélité</span><span>−{eur(calc.reward)}</span></div>}
-          {calc.manual > 0 && <div className="row-between small pos-amount"><span>Remise ({discount.reason})</span><span>−{eur(calc.manual)}</span></div>}
+          {calc.manual > 0 && <div className="row-between small pos-amount"><span>Remise ({discount.reason}{discount.by ? ` · accordée par ${discount.by}` : ''})</span><span>−{eur(calc.manual)}</span></div>}
           <div className="cart-total"><span>Total</span><span>{eur(calc.total)}</span></div>
           <div className="actions" style={{ justifyContent: 'stretch' }}>
-            {cat.canDiscount && !offline && <button onClick={discount ? () => setDiscount(null) : askDiscount}>{discount ? 'Retirer la remise' : 'Remise'}</button>}
+            {!offline && <button onClick={discount ? () => setDiscount(null) : cat.canDiscount ? askDiscount : () => setShowApprove(true)}>{discount ? 'Retirer la remise' : cat.canDiscount ? 'Remise' : 'Remise (accord gérant)'}</button>}
             <button className="primary" style={{ flex: 1, minHeight: 56, fontSize: '1.15rem' }} onClick={() => setShowPay(true)}>Encaisser {eur(calc.total)}</button>
           </div>
           {canOrder && !attached && <button style={{ width: '100%', minHeight: 48, marginTop: 8 }} disabled={offline} onClick={() => { setError(''); setShowSend(true); }}>🍽 Envoyer en cuisine{offline ? ' (réseau nécessaire)' : ''}</button>}
@@ -345,6 +401,7 @@ export default function Pos({ me }) {
 
   return (
     <div>
+      <ShiftBar sh={sh} go={go} />
       {offline && <div className="banner off"><span><strong>Hors-ligne.</strong> Vous pouvez continuer à vendre : les ventes seront envoyées dès que le réseau revient.</span><button onClick={() => { load(); sync(); }}>Réessayer</button></div>}
       {qinfo.q > 0 && <div className="banner off"><span><strong>{qinfo.q}</strong> vente{qinfo.q > 1 ? 's' : ''} en attente d'envoi.</span><button onClick={sync}>Envoyer maintenant</button></div>}
       {qinfo.f > 0 && <div className="banner err"><span><strong>{qinfo.f}</strong> vente{qinfo.f > 1 ? 's' : ''} hors-ligne refusée{qinfo.f > 1 ? 's' : ''} par le serveur.</span><button onClick={() => setShowPending(true)}>Voir</button></div>}
@@ -381,6 +438,7 @@ export default function Pos({ me }) {
         </div>
       )}
       {showPay && <PayModal total={calc.total} customer={customerId} canCredit={cat.canCredit} onClose={() => { setShowPay(false); setError(''); }} onPay={pay} busy={busy} error={error} />}
+      {showApprove && <ApproveDiscount onClose={() => setShowApprove(false)} onOk={(d) => { setDiscount(d); setShowApprove(false); }} />}
       {showSend && <SendModal lines={lines} onClose={() => { setShowSend(false); setError(''); }} onSend={sendToKitchen} busy={busy} error={error} />}
       {showTabs && <TabsModal onClose={() => setShowTabs(false)} onPick={pickTab} />}
       {showPending && <PendingModal onClose={() => setShowPending(false)} />}

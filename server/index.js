@@ -29,6 +29,8 @@ setInterval(() => {
   try { ctx.ensureDailyBackup(); } catch (e) { console.error('Sauvegarde automatique impossible :', e.message); }
 }, 15 * 60 * 1000).unref();
 
+import('./cash-review.js').then(({ cashReminderTick }) => setInterval(() => { try { cashReminderTick(ctx); } catch { /* ok */ } }, 60 * 1000).unref());
+
 const server = ctx.app.listen(port, () => console.log(`Boutique prête sur http://localhost:${port}  (données : ${dataDir}${cloud ? ', copie en ligne activée' : ''})`));
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, async () => {

@@ -731,6 +731,85 @@ CREATE TABLE server_secrets (
 );
 `,
   },
+  {
+    version: 11,
+    name: 'quarts-de-caisse',
+    sql: `
+ALTER TABLE cash_moves ADD COLUMN category TEXT NOT NULL DEFAULT '';
+ALTER TABLE closures ADD COLUMN shift_id INTEGER;
+CREATE TABLE shifts (
+  id INTEGER PRIMARY KEY,
+  number TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  user_name TEXT NOT NULL,
+  opened_at TEXT NOT NULL,
+  day TEXT NOT NULL,
+  from_sale_id INTEGER NOT NULL,
+  from_cash_move_id INTEGER NOT NULL,
+  opening_expected_cents INTEGER,
+  opening_counted_cents INTEGER NOT NULL CHECK (opening_counted_cents >= 0),
+  opening_variance_cents INTEGER,
+  opening_note TEXT NOT NULL DEFAULT '',
+  closure_id INTEGER REFERENCES closures(id),
+  closed_at TEXT,
+  closed_by_id INTEGER,
+  closed_by_name TEXT,
+  forced INTEGER NOT NULL DEFAULT 0 CHECK (forced IN (0,1))
+);
+CREATE UNIQUE INDEX shifts_one_open ON shifts ((1)) WHERE closed_at IS NULL;
+CREATE TRIGGER shifts_no_delete BEFORE DELETE ON shifts
+BEGIN SELECT RAISE(ABORT, 'Un quart de caisse ne se supprime pas'); END;
+CREATE TRIGGER shifts_opening_frozen BEFORE UPDATE ON shifts
+WHEN NEW.id <> OLD.id OR NEW.number <> OLD.number OR NEW.user_id <> OLD.user_id OR NEW.opened_at <> OLD.opened_at
+  OR NEW.opening_counted_cents <> OLD.opening_counted_cents OR NEW.opening_note <> OLD.opening_note
+  OR IFNULL(NEW.opening_expected_cents, -1) <> IFNULL(OLD.opening_expected_cents, -1) OR NEW.from_sale_id <> OLD.from_sale_id
+  OR OLD.closed_at IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'L''ouverture d''un quart ne se modifie pas'); END;
+`,
+  },
+  {
+    version: 12,
+    name: 'versements-et-verification',
+    sql: `
+ALTER TABLE shifts ADD COLUMN deposit_requested_at TEXT;
+ALTER TABLE shifts ADD COLUMN deposit_requested_by TEXT;
+ALTER TABLE shifts ADD COLUMN deposit_request_note TEXT NOT NULL DEFAULT '';
+CREATE TABLE cash_reviews (
+  id INTEGER PRIMARY KEY,
+  closure_id INTEGER NOT NULL UNIQUE REFERENCES closures(id),
+  reviewed_at TEXT NOT NULL,
+  reviewer_id INTEGER,
+  reviewer_name TEXT NOT NULL,
+  variance_cents INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT ''
+);
+CREATE TRIGGER cash_reviews_no_update BEFORE UPDATE ON cash_reviews
+BEGIN SELECT RAISE(ABORT, 'Une vérification de caisse ne se modifie pas'); END;
+CREATE TRIGGER cash_reviews_no_delete BEFORE DELETE ON cash_reviews
+BEGIN SELECT RAISE(ABORT, 'Une vérification de caisse ne se supprime pas'); END;
+`,
+  },
+  {
+    version: 13,
+    name: 'role-serveur',
+    // SQLite ne sait pas modifier un CHECK : on élargit la liste des rôles (procédure officielle « writable_schema »,
+    // sans danger car on ne fait que relâcher la contrainte).
+    up(db) {
+      db.exec('PRAGMA writable_schema = ON');
+      db.exec(`UPDATE sqlite_master SET sql = replace(sql, '''cashier'',''cook''', '''cashier'',''cook'',''waiter''') WHERE type = 'table' AND name = 'users'`);
+      db.exec('PRAGMA writable_schema = OFF');
+      const v = db.prepare('PRAGMA schema_version').get().schema_version;
+      db.exec(`PRAGMA schema_version = ${v + 1}`);
+    },
+  },
+  {
+    version: 14,
+    name: 'remise-autorisee',
+    sql: `
+ALTER TABLE sales ADD COLUMN discount_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE sales ADD COLUMN discount_by_name TEXT NOT NULL DEFAULT '';
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.at(-1).version;
@@ -746,7 +825,7 @@ export function migrate(db, now = () => new Date()) {
   }
   for (const m of MIGRATIONS.filter((x) => x.version > current)) {
     tx(db, () => {
-      db.exec(m.sql);
+      if (m.up) m.up(db); else db.exec(m.sql);
       db.prepare('INSERT INTO schema_version (version, name, applied_at) VALUES (?, ?, ?)').run(
         m.version, m.name, now().toISOString());
     });

@@ -3,6 +3,8 @@ import { intId } from './common.js';
 import { createOrder, advanceOrder, cancelOrder, board, openTabs, orderView } from './orders.js';
 import { createPush } from './push.js';
 import { can } from './permissions.js';
+import { balanceOf } from './customers.js';
+import { nameKey } from '../shared/units.js';
 
 const summary = (o, onlyKitchen = true) => o.lines.filter((l) => !onlyKitchen || l.kitchen).map((l) => `${l.qty} × ${l.name}${l.note ? ` (${l.note})` : ''}`).join(', ');
 
@@ -11,7 +13,18 @@ export function registerOrders({ api, ctx, auth, need, actorOf }) {
   const push = () => ctx.push;
 
   api.get('/orders/board', auth, need('orders.view'), (req, res) => res.json({ ...board(ctx.db, ctx.tz(), ctx.now()), can: { take: can(req.user.role, 'orders.take'), kitchen: can(req.user.role, 'orders.kitchen'), serve: can(req.user.role, 'orders.serve'), cancel_any: can(req.user.role, 'orders.cancel_any') } }));
-  api.get('/orders/tabs', auth, need('orders.take'), (req, res) => res.json({ tabs: openTabs(ctx.db) }));
+  api.get('/orders/tabs', auth, need('orders.take'), (req, res) => {
+    const tabs = openTabs(ctx.db);
+    // un client enregistré dont le nom est celui de l'addition (un seul) : on montre son ardoise (réservé à ceux qui voient les clients)
+    if (can(req.user.role, 'customers.view')) {
+      const cs = ctx.db.prepare('SELECT id, name, credit_limit_cents FROM customers WHERE active = 1').all();
+      for (const t of tabs) {
+        const m = cs.filter((c) => nameKey(c.name) === t.key);
+        if (m.length === 1) t.customer = { id: m[0].id, name: m[0].name, balance_cents: balanceOf(ctx.db, m[0].id), credit_limit_cents: m[0].credit_limit_cents };
+      }
+    }
+    res.json({ tabs });
+  });
 
   api.post('/orders', auth, need('orders.take'), (req, res) => {
     const r = createOrder(ctx, actorOf(req.user), req.body);

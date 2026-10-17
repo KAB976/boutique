@@ -12,6 +12,7 @@ const SHORTCUTS = [
   ['customers', '👥 Clients', 'Ardoises, règlements, tampons de fidélité', 'customers.view'],
   ['suppliers', '🚚 Fournisseurs', 'Bons de commande, réceptions, dettes', 'purchasing.manage'],
   ['promotions', '🎁 Promotions', '2 achetés 1 offert, lots, fidélité', 'promotions.manage'],
+  ['cashcheck', '🧮 Vérifier les caisses', 'Écarts de chaque quart, versements, validation du jour', 'cash.review'],
   ['management', '📊 Gestion', 'Résultat réel, statistiques, dépenses, export Excel', 'stats.view'],
 ];
 
@@ -33,6 +34,7 @@ export default function Home({ me, go }) {
         <ul className="tobuy">
           <li>Tout ce qui touche à l'argent et au stock est écrit dans un journal qu'on ne peut ni modifier ni effacer : une erreur se corrige par une annulation, jamais en effaçant.</li>
           <li>Les montants des ventes sont calculés au centime ; le prix de revient vient du coût réel des ingrédients achetés.</li>
+          <li>Quart de caisse : chaque caissier ouvre son quart avec son code (il compte le fond de caisse laissé par le précédent) et le ferme avant de partir (comptage, fond laissé, code). Le caissier ne voit aucun total : il compte, laisse le fond et verse le reste. L'administrateur vérifie l'écart dans « Vérif. caisses » et peut demander un versement quand il y a trop d'espèces. Les sorties d'espèces ont toujours un motif et une note.</li>
           <li>Commandes : on les envoie en cuisine depuis la Caisse (« Envoyer en cuisine »), la cuisine sonne, puis la personne qui a pris la commande est prévenue quand elle est prête. L'addition se règle à la fin du repas ou tout de suite.</li>
           <li>Sans réseau, la caisse continue : les ventes sont gardées dans l'appareil et envoyées toutes seules au retour du réseau.</li>
         </ul>

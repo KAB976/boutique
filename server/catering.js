@@ -1,4 +1,5 @@
 import { tx } from './db.js';
+import { assertDrawer } from './shifts.js';
 import { bad, notFound, conflict } from './errors.js';
 import { writeAudit } from './audit.js';
 import { fmtBase, round6 } from '../shared/units.js';
@@ -136,6 +137,7 @@ export function addPayment(db, ts, day, actor, id, b) {
     const r = db.prepare('INSERT INTO catering_payments (order_id, ts, day, kind, method, amount_cents, user_name, note) VALUES (?,?,?,?,?,?,?,?)')
       .run(id, ts, day, kind, method, signed, actor?.name ?? null, text(b.note ?? '', 'Note', { max: 200 }));
     if (method === 'cash') {
+      assertDrawer(db, actor);
       db.prepare('INSERT INTO cash_moves (ts, day, amount_cents, reason, ref, user_id, user_name) VALUES (?,?,?,?,?,?,?)')
         .run(ts, day, signed, `Traiteur ${o.number} — ${kind === 'deposit' ? 'acompte' : kind === 'balance' ? 'solde' : 'remboursement'}`, `catering:${Number(r.lastInsertRowid)}`, actor?.id ?? null, actor?.name ?? null);
     }
