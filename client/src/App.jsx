@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, getToken, setToken, setUnauthorizedHandler } from './api.js';
 import { ErrorBox } from './ui.jsx';
 import Setup from './pages/Setup.jsx';
@@ -42,12 +42,23 @@ const TABS = [
   { id: 'customers', label: 'Clients', perm: 'customers.view', Page: Customers },
   { id: 'suppliers', label: 'Fournisseurs', perm: 'purchasing.manage', Page: Suppliers },
   { id: 'promotions', label: 'Promotions', perm: 'promotions.manage', Page: Promotions },
-  { id: 'management', label: 'Gestion', perm: 'stats.view', Page: Management },
+  { id: 'management', label: 'Résultats', perm: 'stats.view', Page: Management },
   { id: 'settings', label: 'Réglages', perm: 'settings.edit', Page: Settings },
   { id: 'users', label: 'Comptes', perm: 'users.manage', Page: Users },
   { id: 'audit', label: 'Journal', perm: 'audit.view', Page: Audit },
   { id: 'backups', label: 'Sauvegardes', perm: 'backup.manage', Page: Backups },
   { id: 'account', label: 'Mon compte', perm: null, Page: Account },
+];
+
+/** Menus : comme dans Office, une barre de menus en haut et, dessous, les pages du menu choisi. */
+const GROUPS = [
+  { id: 'g-home', label: 'Accueil', tabs: ['home'] },
+  { id: 'g-sell', label: 'Vente', tabs: ['pos', 'orders', 'sales', 'cashcheck'] },
+  { id: 'g-kitchen', label: 'Cuisine et stock', tabs: ['kitchen', 'recipes', 'stock'] },
+  { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'promotions'] },
+  { id: 'g-people', label: 'Clients et achats', tabs: ['customers', 'catering', 'suppliers'] },
+  { id: 'g-mgmt', label: 'Gestion', tabs: ['management'] },
+  { id: 'g-admin', label: 'Administration', tabs: ['settings', 'users', 'audit', 'backups'] },
 ];
 
 const firstTab = (u) => (u.role === 'cashier' ? 'pos' : u.role === 'cook' || u.role === 'waiter' ? 'orders' : 'home');
@@ -64,6 +75,7 @@ function AlertBar({ me, tab, go }) {
 
 export default function App() {
   const boardNow = useBoard();
+  const lastInGroup = useRef({});
   const [phase, setPhase] = useState('loading'); // loading | setup | login | app | error
   const [me, setMe] = useState(null);
   const [pub, setPub] = useState({ shop_name: '', logo: '' });
@@ -129,6 +141,11 @@ export default function App() {
   const tabs = TABS.filter((t) => (!t.perm || me.permissions.includes(t.perm)) && (!away || t.id === 'pos' || t.id === 'account'));
   const current = mustChange ? TABS.find((t) => t.id === 'account') : tabs.find((t) => t.id === tab) || tabs[0];
   const Page = current.Page;
+  const visible = new Set(tabs.map((t) => t.id));
+  const groups = GROUPS.map((g) => ({ ...g, pages: g.tabs.filter((id) => visible.has(id)).map((id) => TABS.find((t) => t.id === id)) })).filter((g) => g.pages.length);
+  const group = groups.find((g) => g.pages.some((t) => t.id === current.id));
+  const openGroup = (g) => { const last = lastInGroup.current[g.id]; setTab(g.pages.some((t) => t.id === last) ? last : g.pages[0].id); };
+  if (group) lastInGroup.current[group.id] = current.id;
 
   return (
     <div className="shell">
@@ -137,14 +154,21 @@ export default function App() {
           {pub.logo ? <img src={pub.logo} alt="" /> : <span className="logo-fallback">🍽</span>}
           <strong>{pub.shop_name || 'Boutique'}</strong>
         </div>
-        <div className="who"><span>{me.name}</span><span className="badge">{me.roleLabel}</span><button onClick={logout}>Se déconnecter</button></div>
+        <div className="who"><span>{me.name}</span><span className="badge">{me.roleLabel}</span>{!mustChange && <button className={current.id === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Mon compte</button>}<button onClick={logout}>Se déconnecter</button></div>
       </header>
       {away && <div className="banner off" style={{ margin: '0 0 8px' }}><span><strong>Pas de réseau.</strong> Seule la caisse est disponible ; les ventes partiront dès le retour du réseau.</span><button onClick={() => { setPhase('loading'); boot(); }}>Réessayer</button></div>}
       {!mustChange && !away && <AlertBar me={me} tab={current.id} go={setTab} />}
       {!mustChange && (
-        <nav className="tabs" aria-label="Menu">
-          {tabs.map((t) => <button key={t.id} className={t.id === current.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}{t.id === 'orders' && badge > 0 ? <span className="count">{badge}</span> : null}</button>)}
-        </nav>
+        <div className="menu">
+          <nav className="menubar" aria-label="Menu">
+            {groups.map((g) => <button key={g.id} className={group?.id === g.id ? 'active' : ''} onClick={() => openGroup(g)}>{g.label}{g.pages.some((t) => t.id === 'orders') && badge > 0 ? <span className="count">{badge}</span> : null}</button>)}
+          </nav>
+          {group && group.pages.length > 1 && (
+            <nav className="ribbon" aria-label={`Pages du menu ${group.label}`}>
+              {group.pages.map((t) => <button key={t.id} className={t.id === current.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}{t.id === 'orders' && badge > 0 ? <span className="count">{badge}</span> : null}</button>)}
+            </nav>
+          )}
+        </div>
       )}
       <main>
         <Page me={me} go={setTab} forced={mustChange} onPublicChange={() => api.get('/api/public').then(setPub)} onPinChanged={() => { setTab('account'); api.get('/api/me').then(setMe); }} onRelogin={toLogin} />

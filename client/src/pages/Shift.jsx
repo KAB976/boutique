@@ -26,7 +26,7 @@ function OpenForm({ me, sh }) {
         ? <Notice tone="info">Le quart précédent a laissé <strong>{eur(expected)}</strong> dans le tiroir. Vérifiez que c'est bien le cas.</Notice>
         : <Notice tone="info">Premier quart : comptez le fond de caisse de départ (peut être 0 €).</Notice>}
       <ErrorBox error={error} />
-      <Field label="Espèces comptées dans le tiroir (€)"><input inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" autoFocus /></Field>
+      <Field label="Fond de caisse : espèces comptées dans le tiroir (€)" hint="Comptez tout l'argent qui est dans le tiroir en arrivant : c'est le fond de caisse de départ."><input inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" autoFocus /></Field>
       {diff != null && <p className={diff === 0 ? 'pos-amount' : 'neg'}>{diff === 0 ? '✓ C’est juste.' : `Écart avec ce qui devait être laissé : ${eurSigned(diff)} (${diff < 0 ? 'il manque' : 'il y a en trop'} ${eur(Math.abs(diff))})`}</p>}
       {diff != null && diff !== 0 && <Field label="Expliquez l'écart (obligatoire)" hint="Il sera écrit dans le journal, au nom du quart précédent."><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></Field>}
       <PinInput value={pin} onChange={setPin} />

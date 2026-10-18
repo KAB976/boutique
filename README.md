@@ -175,3 +175,14 @@ Tests : `npm test`.
 - Mise à jour d'une base existante : la migration 13 autorise le rôle Serveur sans toucher aux données.
 - **Plusieurs additions d'un coup** (v1.4.1) : dans « Additions ouvertes », cochez « Regrouper » sur Table 4, Table 1… puis « Encaisser le tout » : une seule vente. Choisissez le client, puis « 📒 Tout mettre sur l'ardoise du client ». La limite d'ardoise est vérifiée ; si elle est dépassée, rien n'est enregistré et les additions restent ouvertes.
 - **Remise spéciale autorisée par le gérant** (v1.4.2) : seul le gérant ou le propriétaire peut accorder une remise libre. Le caissier touche « Remise (accord gérant) », saisit le montant et le motif, et le gérant choisit son nom et tape SON code sur cet appareil. Le code est vérifié tout de suite (5 erreurs = blocage 60 s). La vente enregistre qui a demandé (le caissier), qui a autorisé (le gérant) et le motif ; c'est dans le journal et dans le détail de la vente. Impossible sans réseau.
+
+## Version 1.5 : menus comme dans Office
+Barre de menus en haut (Accueil, Vente, Cuisine et stock, Catalogue, Clients et achats, Gestion, Administration) et, dessous, les pages du menu choisi : 
+- **Vente** : Caisse, Commandes, Ventes et clôture, Vérif. caisses
+- **Cuisine et stock** : Cuisine, Recettes, Stock
+- **Catalogue** : Articles, Promotions
+- **Clients et achats** : Clients, Traiteur, Fournisseurs
+- **Gestion** : Résultats (statistiques, dépenses, export)
+- **Administration** : Réglages, Comptes, Journal, Sauvegardes
+« Mon compte » est à côté du nom, en haut à droite. Chacun ne voit que les menus auxquels il a droit ; un menu qui n'a qu'une page l'ouvre directement. Le menu se souvient de la dernière page ouverte.
+Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces comptées dans le tiroir » ; à la clôture par le gérant, « Total des espèces comptées dans le tiroir (fond de caisse compris) ».

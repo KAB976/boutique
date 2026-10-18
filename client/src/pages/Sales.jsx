@@ -207,7 +207,7 @@ function Closure({ me }) {
               </div>
             ) : (
               <div className="grid">
-                <Field label="Espèces comptées dans le tiroir (€)"><input inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" /></Field>
+                <Field label="Total des espèces comptées dans le tiroir (€)" hint="Tout ce qui est dans le tiroir, fond de caisse compris."><input inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0,00" /></Field>
                 <Field label="Fond de caisse que vous laissez (€)" hint="Le reste est retiré de la caisse (dépôt)."><input inputMode="decimal" value={floatOut} onChange={(e) => setFloatOut(e.target.value)} placeholder="0,00" /></Field>
               </div>
             )}
