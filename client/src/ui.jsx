@@ -2,12 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 
 export function Modal({ title, onClose, children, wide }) {
   const ref = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose; // toujours la dernière version, sans relancer l'effet
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', onKey);
-    ref.current?.querySelector('input,select,button.primary')?.focus();
+    // le focus n'est donné qu'UNE fois, à l'ouverture (sinon il revenait sur le premier champ à chaque rafraîchissement de la page)
+    if (!ref.current?.contains(document.activeElement)) ref.current?.querySelector('input,select,button.primary')?.focus();
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
@@ -81,3 +84,18 @@ export const perUnit = (x, family) => {
 export const fmtDay = (iso) => { try { return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('fr-FR', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return iso; } };
 export const FAMILY_FR = { mass: 'Poids (g, kg)', volume: 'Volume (ml, l)', count: 'À la pièce' };
 export const TYPE_FR = { receipt: 'Réception', loss: 'Perte', inventory: 'Inventaire', price_fix: 'Prix complété', consume: 'Consommation', production: 'Production', adjust: 'Ajustement' };
+
+/**
+ * Unité proposée par défaut pour saisir une quantité de stock : celle dans laquelle le stock s'affiche (kg, l, pièces…),
+ * jamais « mg » ou « ml » (on saisirait 2,5 en croyant des kilos). Avec des conditionnements (paquets…), le niveau d'achat habituel.
+ */
+export function defaultStockUnit(it, { packs = true } = {}) {
+  if (!it) return '';
+  if (packs && it.packs?.length) return `pack:${Math.min(it.purchase_depth, it.packs.length - 1)}`;
+  const units = it.units ?? [];
+  const tail = String(it.stockText ?? '').trim().split(/\s+/).pop().toLowerCase();
+  const byTail = it.stock > 0 ? units.find((u) => u.label.toLowerCase() === tail || `${u.label.toLowerCase()}s` === tail) : null;
+  if (byTail) return byTail.code;
+  const pref = { mass: ['kg', 'g'], volume: ['l', 'ml'], count: ['piece'] }[it.family] ?? [];
+  return pref.find((c) => units.some((u) => u.code === c)) ?? units[0]?.code ?? '';
+}

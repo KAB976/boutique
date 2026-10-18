@@ -16,7 +16,7 @@ export default function IngredientForm({ ing, measures, onClose, onSaved }) {
     packs: (ing?.packs ?? []).map((p) => ({ label: p.label, contains: toStr(p.contains) })),
     purchase_depth: ing?.purchase_depth ?? 0,
     equivs: (ing?.equivalences ?? []).map((e) => ({ unit: e.unit, base_qty: toStr(e.base_qty) })),
-    thQty: ing?.threshold != null ? toStr(ing.threshold) : '', thUnit: (ing?.family ?? 'mass') === 'count' ? 'piece' : BASE_UNIT[ing?.family ?? 'mass'],
+    thQty: ing?.threshold != null ? toStr(ing.threshold) : '', thUnit: ing ? ((ing.family ?? 'mass') === 'count' ? 'piece' : BASE_UNIT[ing.family ?? 'mass']) : 'kg', // nouvel ingrédient : kg/l, pour ne pas saisir « 5 » en croyant des kilos
   }));
   const [tip, setTip] = useState(null);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
@@ -24,7 +24,7 @@ export default function IngredientForm({ ing, measures, onClose, onSaved }) {
   const baseCode = f.family === 'count' ? 'piece' : base;
 
   useEffect(() => { // changement de famille : l'unité du seuil suit
-    if (!THRESH_UNITS[f.family].some(([c]) => c === f.thUnit)) set('thUnit', baseCode);
+    if (!THRESH_UNITS[f.family].some(([c]) => c === f.thUnit)) set('thUnit', ing ? baseCode : ({ mass: 'kg', volume: 'l', count: 'piece' }[f.family] ?? baseCode));
   }, [f.family]); // eslint-disable-line
 
   const suggest = () => run(async () => {

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api.js';
-import { Modal, Field, ErrorBox, Notice, useAsync } from '../ui.jsx';
+import { Modal, Field, ErrorBox, Notice, useAsync, defaultStockUnit } from '../ui.jsx';
 import { eur, eurSigned, parseEuros, toEuroInput, fmtDT, fmtD } from '../money.js';
 
 const PAY = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
-const defaultUnit = (it) => (it.packs?.length ? `pack:${Math.min(it.purchase_depth, it.packs.length - 1)}` : it.units[0]?.code ?? '');
+const defaultUnit = (it) => defaultStockUnit(it);
 const STATUS_TONE = { draft: '', sent: 'warn', partial: 'warn', received: 'ok', cancelled: '' };
 
 function SupplierForm({ s, onClose, onSaved }) {

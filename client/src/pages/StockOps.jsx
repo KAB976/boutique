@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { Field, ErrorBox, Notice, useAsync, money, perUnit, fmtDay, fmtDate, TYPE_FR } from '../ui.jsx';
+import { Field, ErrorBox, Notice, useAsync, money, perUnit, fmtDay, fmtDate, TYPE_FR, defaultStockUnit } from '../ui.jsx';
 
-const defaultUnit = (it) => (it.packs?.length ? `pack:${Math.min(it.purchase_depth, it.packs.length - 1)}` : it.units[0]?.code ?? '');
+const defaultUnit = (it) => defaultStockUnit(it);
 const UnitSelect = ({ item, value, onChange, label = 'Unité' }) => (
   <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} disabled={!item}>
     {(item?.units ?? []).map((u) => <option key={u.code} value={u.code}>{u.label}</option>)}
@@ -99,7 +99,7 @@ export function Loss({ data, onDone }) {
       <ErrorBox error={error} /><Notice tone="ok">{done}</Notice>
       <form onSubmit={submit}>
         <Field label="Ingrédient">
-          <select value={f.ingredient_id} onChange={(e) => set({ ingredient_id: e.target.value, unit: items.find((i) => i.id === Number(e.target.value))?.units[0]?.code ?? '' })}>
+          <select value={f.ingredient_id} onChange={(e) => set({ ingredient_id: e.target.value, unit: defaultStockUnit(items.find((i) => i.id === Number(e.target.value)), { packs: false }) })}>
             <option value="">— choisir —</option>{items.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.stockText})</option>)}
           </select>
         </Field>
@@ -125,7 +125,7 @@ export function Inventory({ data, onDone }) {
   const [note, setNote] = useState('');
   const [done, setDone] = useState(null);
   const { busy, error, run } = useAsync();
-  const partsOf = (it) => counts[it.id] ?? [{ qty: '', unit: it.units[0]?.code ?? '' }];
+  const partsOf = (it) => counts[it.id] ?? [{ qty: '', unit: defaultStockUnit(it, { packs: false }) }];
   const setParts = (it, parts) => { setPreview(null); setDone(null); setCounts((c) => ({ ...c, [it.id]: parts })); };
   const payload = useMemo(() => items.map((it) => ({ ingredient_id: it.id, parts: (counts[it.id] ?? []).filter((p) => p.qty !== '').map((p) => ({ qty: p.qty, unit: p.unit })) })).filter((c) => c.parts.length), [counts, items]);
   const visible = items.filter((i) => i.name.toLowerCase().includes(q.trim().toLowerCase()));
@@ -149,7 +149,7 @@ export function Inventory({ data, onDone }) {
                   <UnitSelect item={it} value={p.unit} onChange={(u) => setParts(it, partsOf(it).map((x, j) => (j === i ? { ...x, unit: u } : x)))} />
                 </div>
               ))}
-              <button type="button" className="link" onClick={() => setParts(it, [...partsOf(it), { qty: '', unit: it.units[0]?.code ?? '' }])}>+ autre unité</button>
+              <button type="button" className="link" onClick={() => setParts(it, [...partsOf(it), { qty: '', unit: defaultStockUnit(it, { packs: false }) }])}>+ autre unité</button>
             </div>
           ))}
           <div className="actions sticky"><button className="primary" disabled={busy || !payload.length} onClick={doPreview}>Voir les écarts ({payload.length})</button></div>
