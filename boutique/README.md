@@ -192,3 +192,5 @@ Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces com
 ## v1.5.3
 - Catégories des ingrédients et des recettes : menu déroulant (liste de départ + catégories déjà utilisées + « Autre… » pour en créer une).
 - Conditionnement : précision que les niveaux s'emboîtent (un seul nom par niveau, pas deux formats alternatifs).
+- Alerte « stock bas » : toutes les unités utiles (kg et g pour un liquide si la densité est connue, ou le conditionnement comme « brique »). Affichage en kg ou l dès 1000.
+- Catégorie des articles de la caisse : menu déroulant aussi.

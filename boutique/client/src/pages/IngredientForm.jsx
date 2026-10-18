@@ -3,7 +3,28 @@ import { api } from '../api.js';
 import { Modal, Field, ErrorBox, Notice, useAsync, FAMILY_FR, CategorySelect, ING_CATEGORIES } from '../ui.jsx';
 
 const BASE_UNIT = { mass: 'g', volume: 'ml', count: 'pièce' };
-const THRESH_UNITS = { mass: [['g', 'g'], ['kg', 'kg']], volume: [['ml', 'ml'], ['l', 'l']], count: [['piece', 'pièce']] };
+const DEFAULT_TH = { mass: 'kg', volume: 'l', count: 'piece' };
+/** Unités proposées pour l'alerte : celles de la famille, + l'autre dimension si la densité est connue, + les conditionnements. */
+function thresholdUnits(f) {
+  const own = { mass: [['g', 'g'], ['kg', 'kg']], volume: [['ml', 'ml'], ['l', 'l']], count: [['piece', 'pièce']] }[f.family];
+  const hasDensity = Number(String(f.density).replace(',', '.')) > 0;
+  const hasPiece = Number(String(f.piece_g).replace(',', '.')) > 0;
+  const out = [...own];
+  if (hasDensity && f.family === 'mass') out.push(['ml', 'ml'], ['l', 'l']);
+  if (hasDensity && f.family === 'volume') out.push(['g', 'g'], ['kg', 'kg']);
+  if (hasPiece && f.family !== 'count') out.push(['piece', 'pièce']);
+  if (hasPiece && f.family === 'count') out.push(['g', 'g'], ['kg', 'kg']);
+  f.packs.forEach((p, i) => { if (p.label.trim()) out.push([`pack:${i}`, p.label.trim()]); });
+  return out;
+}
+/** Seuil enregistré (en unité de base) → quantité + unité lisibles (1500 ml → 1,5 l). */
+function thresholdShown(ing) {
+  if (ing?.threshold == null) return { qty: '', unit: DEFAULT_TH[ing?.family ?? 'mass'] };
+  const t = ing.threshold, fam = ing.family;
+  if (fam === 'count') return { qty: toStr(t), unit: 'piece' };
+  const big = t >= 1000;
+  return { qty: toStr(Math.round((big ? t / 1000 : t) * 1000) / 1000), unit: fam === 'mass' ? (big ? 'kg' : 'g') : (big ? 'l' : 'ml') };
+}
 const toStr = (x) => (x == null ? '' : String(x).replace('.', ','));
 
 /** Création / modification d'un ingrédient. */
@@ -16,16 +37,15 @@ export default function IngredientForm({ ing, measures, usedCategories = [], onC
     packs: (ing?.packs ?? []).map((p) => ({ label: p.label, contains: toStr(p.contains) })),
     purchase_depth: ing?.purchase_depth ?? 0,
     equivs: (ing?.equivalences ?? []).map((e) => ({ unit: e.unit, base_qty: toStr(e.base_qty) })),
-    thQty: ing?.threshold != null ? toStr(ing.threshold) : '', thUnit: ing ? ((ing.family ?? 'mass') === 'count' ? 'piece' : BASE_UNIT[ing.family ?? 'mass']) : 'kg', // nouvel ingrédient : kg/l, pour ne pas saisir « 5 » en croyant des kilos
+    thQty: thresholdShown(ing).qty, thUnit: thresholdShown(ing).unit, // affiché en kg / l dès que c'est ≥ 1000, pour ne pas confondre g et kg
   }));
   const [tip, setTip] = useState(null);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const base = BASE_UNIT[f.family];
-  const baseCode = f.family === 'count' ? 'piece' : base;
 
   useEffect(() => { // changement de famille : l'unité du seuil suit
-    if (!THRESH_UNITS[f.family].some(([c]) => c === f.thUnit)) set('thUnit', ing ? baseCode : ({ mass: 'kg', volume: 'l', count: 'piece' }[f.family] ?? baseCode));
-  }, [f.family]); // eslint-disable-line
+    if (!thresholdUnits(f).some(([c]) => c === f.thUnit)) set('thUnit', DEFAULT_TH[f.family]);
+  }, [f.family, f.density, f.piece_g, f.packs.length]); // eslint-disable-line
 
   const suggest = () => run(async () => {
     const s = await api.get(`/api/ingredients/suggest?name=${encodeURIComponent(f.name)}`);
@@ -120,9 +140,9 @@ export default function IngredientForm({ ing, measures, usedCategories = [], onC
           {f.family !== 'count' && <Field label="Poids d'une pièce (g)" hint="Seulement si vous comptez aussi à la pièce."><input inputMode="decimal" value={f.piece_g} onChange={(e) => set('piece_g', e.target.value)} /></Field>}
           {f.family === 'count' && <Field label="Poids d'une pièce (g)" hint="Pour passer des pièces au poids."><input inputMode="decimal" value={f.piece_g} onChange={(e) => set('piece_g', e.target.value)} /></Field>}
           <Field label="Rendement (%)" hint="Part utilisable après épluchage ou parage. 100 = rien à perdre."><input inputMode="decimal" value={f.yield_pct} onChange={(e) => set('yield_pct', e.target.value)} /></Field>
-          <Field label="Alerte « stock bas » en dessous de" hint="Laisser vide pour ne pas être alerté.">
+          <Field label="Alerte « stock bas » en dessous de" hint="Laisser vide pour ne pas être alerté. Choisissez l'unité à droite (kg, g, l, ml…).">
             <div className="inline"><input inputMode="decimal" value={f.thQty} onChange={(e) => set('thQty', e.target.value)} />
-              <select aria-label="Unité du seuil" value={f.thUnit} onChange={(e) => set('thUnit', e.target.value)}>{THRESH_UNITS[f.family].map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></div>
+              <select aria-label="Unité du seuil" value={f.thUnit} onChange={(e) => set('thUnit', e.target.value)}>{thresholdUnits(f).map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></div>
           </Field>
           <CategorySelect value={f.category} onChange={(v) => set('category', v)} defaults={ING_CATEGORIES} used={usedCategories} />
           <Field label="Lieu de stockage"><input value={f.storage} onChange={(e) => set('storage', e.target.value)} maxLength={40} /></Field>

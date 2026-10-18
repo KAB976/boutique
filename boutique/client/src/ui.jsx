@@ -118,3 +118,4 @@ export function CategorySelect({ value, onChange, defaults, used = [], label = '
 }
 export const ING_CATEGORIES = ['Farines et céréales', 'Sucres et édulcorants', 'Produits laitiers', 'Œufs', 'Viandes', 'Poissons et fruits de mer', 'Fruits', 'Légumes', 'Huiles et matières grasses', 'Épices et condiments', 'Boissons', 'Conserves', 'Emballages', 'Autre'];
 export const RECIPE_CATEGORIES = ['Petit déjeuner', 'Entrée', 'Plat', 'Accompagnement', 'Dessert', 'Pâtisserie', 'Boisson', 'Sauce', 'Snack'];
+export const PRODUCT_CATEGORIES = ['Petit déjeuner', 'Plats', 'Desserts', 'Pâtisseries', 'Boissons chaudes', 'Boissons fraîches', 'Snacks', 'Autre'];
