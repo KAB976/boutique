@@ -36,6 +36,7 @@ async function ensureTool(cmd, wingetId, label) {
 
 async function main() {
   say('MISE EN LIGNE DE BOUTIQUE (gratuit : GitHub + Render + Supabase)');
+  say(`\n>>> VERSION À ENVOYER : ${VERSION}   (dossier : ${root})\n`);
   if (Number(process.versions.node.split('.')[0]) < 22) stop('Node.js 22 ou plus récent est nécessaire (https://nodejs.org, version LTS).');
 
   await ensureTool('git', 'Git.Git', 'Git');
@@ -67,10 +68,22 @@ async function main() {
     const r = run('gh', ['repo', 'create', 'boutique', '--public', '--source=.', '--remote=origin', '--push']);
     if (r.status !== 0) stop('Impossible de créer le dépôt GitHub (un dépôt « boutique » existe peut-être déjà sur votre compte : supprimez-le sur github.com ou renommez-le, puis relancez).');
   } else {
-    const r = run('git', ['push', '-u', 'origin', 'main']);
-    if (r.status !== 0) stop('L\'envoi vers GitHub a échoué.');
+    let r = run('git', ['push', '-u', 'origin', 'main']);
+    if (r.status !== 0) {
+      // Le plus souvent : des fichiers ont été ajoutés à la main sur github.com. Ce dépôt ne contient que le programme : on le remplace par celui de ce dossier.
+      say('GitHub a refusé l\'envoi normal (le dépôt a été modifié à la main). Je le remplace par le contenu de ce dossier…');
+      r = run('git', ['push', '-u', '--force', 'origin', 'main']);
+      if (r.status !== 0) stop('L\'envoi vers GitHub a échoué.');
+    }
   }
   say('Programme envoyé sur GitHub.');
+  // Contrôle : la version qui est sur GitHub est-elle bien celle de ce dossier ?
+  try {
+    const raw = out('gh', ['api', `repos/${user}/boutique/contents/package.json`, '--jq', '.content']);
+    const onGithub = JSON.parse(Buffer.from(raw, 'base64').toString('utf8')).version;
+    if (onGithub !== VERSION) stop(`GitHub contient la version ${onGithub} au lieu de ${VERSION}. Rien n'a été mis en ligne. Dites-le-moi.`);
+    say(`✓ GitHub contient bien la version ${onGithub}.`);
+  } catch (e) { if (String(e.message).includes('GitHub contient')) throw e; say('(Contrôle de la version sur GitHub impossible, on continue.)'); }
 
   // ---------- mise à jour d'une installation existante ----------
   if (fs.existsSync(MARK)) {

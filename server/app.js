@@ -9,6 +9,7 @@ import { can, permissionsOf, ROLES, ROLE_LABELS } from './permissions.js';
 import { writeAudit, verifyAudit, listAudit } from './audit.js';
 import { registerStock } from './stock-routes.js';
 import { registerRecipes } from './recipes-routes.js';
+import { registerCategories } from './categories.js';
 import { registerPos } from './pos-routes.js';
 import { registerOrders } from './orders-routes.js';
 import { createRequire } from 'node:module';
@@ -240,6 +241,7 @@ export function createApp({ dataDir, now = () => new Date(), staticDir = null, c
 
   // ---------- recettes (étape 3) ----------
   registerRecipes({ api, ctx, auth, need, iso, actorOf });
+  registerCategories({ api, ctx, auth, need, iso, actorOf });
 
   // ---------- produits, production, caisse, clients, fournisseurs, traiteur, gestion (étapes 4 à 9) ----------
   registerPos({ api, ctx, auth, need, iso, actorOf });

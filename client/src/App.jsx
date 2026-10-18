@@ -5,6 +5,8 @@ import Setup from './pages/Setup.jsx';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Settings from './pages/Settings.jsx';
+import Categories from './pages/Categories.jsx';
+import { VersionBadge, UpdateBanner, useServerVersion } from './version.jsx';
 import Stock from './pages/Stock.jsx';
 import Recipes from './pages/Recipes.jsx';
 import Users from './pages/Users.jsx';
@@ -38,6 +40,7 @@ const TABS = [
   { id: 'recipes', label: 'Recettes', perm: 'recipes.view', Page: Recipes },
   { id: 'stock', label: 'Stock', perm: 'stock.view', Page: Stock },
   { id: 'products', label: 'Articles', perm: 'products.edit', Page: Products },
+  { id: 'categories', label: 'Catégories', perm: 'categories.edit', Page: Categories },
   { id: 'catering', label: 'Traiteur', perm: 'catering.view', Page: Catering },
   { id: 'customers', label: 'Clients', perm: 'customers.view', Page: Customers },
   { id: 'suppliers', label: 'Fournisseurs', perm: 'purchasing.manage', Page: Suppliers },
@@ -55,7 +58,7 @@ const GROUPS = [
   { id: 'g-home', label: 'Accueil', tabs: ['home'] },
   { id: 'g-sell', label: 'Vente', tabs: ['pos', 'orders', 'sales', 'cashcheck'] },
   { id: 'g-kitchen', label: 'Cuisine et stock', tabs: ['kitchen', 'recipes', 'stock'] },
-  { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'promotions'] },
+  { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'categories', 'promotions'] },
   { id: 'g-people', label: 'Clients et achats', tabs: ['customers', 'catering', 'suppliers'] },
   { id: 'g-mgmt', label: 'Gestion', tabs: ['management'] },
   { id: 'g-admin', label: 'Administration', tabs: ['settings', 'users', 'audit', 'backups'] },
@@ -75,6 +78,7 @@ function AlertBar({ me, tab, go }) {
 
 export default function App() {
   const boardNow = useBoard();
+  const serverVersion = useServerVersion();
   const lastInGroup = useRef({});
   const [phase, setPhase] = useState('loading'); // loading | setup | login | app | error
   const [me, setMe] = useState(null);
@@ -153,10 +157,12 @@ export default function App() {
         <div className="brand">
           {pub.logo ? <img src={pub.logo} alt="" /> : <span className="logo-fallback">🍽</span>}
           <strong>{pub.shop_name || 'Boutique'}</strong>
+          <VersionBadge server={serverVersion} />
         </div>
         <div className="who"><span>{me.name}</span><span className="badge">{me.roleLabel}</span>{!mustChange && <button className={current.id === 'account' ? 'active' : ''} onClick={() => setTab('account')}>Mon compte</button>}<button onClick={logout}>Se déconnecter</button></div>
       </header>
       {away && <div className="banner off" style={{ margin: '0 0 8px' }}><span><strong>Pas de réseau.</strong> Seule la caisse est disponible ; les ventes partiront dès le retour du réseau.</span><button onClick={() => { setPhase('loading'); boot(); }}>Réessayer</button></div>}
+      {!away && <UpdateBanner server={serverVersion} />}
       {!mustChange && !away && <AlertBar me={me} tab={current.id} go={setTab} />}
       {!mustChange && (
         <div className="menu">

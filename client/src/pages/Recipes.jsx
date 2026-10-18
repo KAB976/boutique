@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api.js';
-import { Modal, Field, ErrorBox, Notice, useAsync, money, fmtDate } from '../ui.jsx';
+import { Modal, Field, ErrorBox, Notice, useAsync, money, fmtDate, CategorySelect } from '../ui.jsx';
 
 const BASE_UNIT = { mass: 'g', volume: 'ml', count: 'piece' };
 const defaultUnit = (it) => (it.units.find((u) => u.code === BASE_UNIT[it.family])?.code ?? it.units[0]?.code ?? '');
@@ -319,7 +319,7 @@ function Editor({ recipe, categories, defaultArchived = false, onClose, onSaved 
         <ErrorBox error={error} />
         <div className="grid">
           <Field label="Nom de la recette"><input value={f.name} maxLength={80} onChange={(e) => set('name', e.target.value)} required /></Field>
-          <Field label="Catégorie" hint="Entrée, plat, dessert…"><input list="rec-cats" value={f.category} maxLength={40} onChange={(e) => set('category', e.target.value)} /><datalist id="rec-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist></Field>
+          <CategorySelect kind="recipe" value={f.category} onChange={(v) => set('category', v)} />
           <Field label="Écrite pour combien de personnes ?" hint="Les quantités ci-dessous correspondent à ce nombre."><input inputMode="decimal" value={f.servings} onChange={(e) => set('servings', e.target.value)} required /></Field>
           <Field label="Préparation (minutes)"><input inputMode="numeric" value={f.prep_min} onChange={(e) => set('prep_min', e.target.value)} /></Field>
           <Field label="Cuisson (minutes)"><input inputMode="numeric" value={f.cook_min} onChange={(e) => set('cook_min', e.target.value)} /></Field>

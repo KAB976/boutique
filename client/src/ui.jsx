@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { api } from './api.js';
 
 export function Modal({ title, onClose, children, wide }) {
   const ref = useRef(null);
@@ -98,4 +99,33 @@ export function defaultStockUnit(it, { packs = true } = {}) {
   if (byTail) return byTail.code;
   const pref = { mass: ['kg', 'g'], volume: ['l', 'ml'], count: ['piece'] }[it.family] ?? [];
   return pref.find((c) => units.some((u) => u.code === c)) ?? units[0]?.code ?? '';
+}
+
+/** Catégories d'un type (ingredient | recipe | product), lues sur le serveur. */
+export function useCategories(kind) {
+  const [st, setSt] = React.useState({ names: [], loaded: false });
+  React.useEffect(() => {
+    let ok = true;
+    api.get('/api/categories').then((d) => { if (ok) setSt({ names: (d[kind] ?? []).map((c) => c.name), loaded: true }); }).catch(() => { if (ok) setSt({ names: [], loaded: true }); });
+    return () => { ok = false; };
+  }, [kind]);
+  return st;
+}
+
+/** Menu déroulant de catégorie. « Autre… » permet d'en écrire une nouvelle (elle sera proposée ensuite). La liste se gère dans Catalogue › Catégories. */
+export function CategorySelect({ kind, value, onChange, label = 'Catégorie', hint = 'Pour modifier la liste : Catalogue › Catégories.' }) {
+  const { names, loaded } = useCategories(kind);
+  const match = names.find((n) => n.toLowerCase() === value.trim().toLowerCase());
+  const [other, setOther] = React.useState(false);
+  const isOther = other || (loaded && value !== '' && !match);
+  return (
+    <Field label={label} hint={hint}>
+      <select value={isOther ? '__other' : (match ?? '')} onChange={(e) => { if (e.target.value === '__other') { setOther(true); onChange(''); } else { setOther(false); onChange(e.target.value); } }}>
+        <option value="">— Choisir —</option>
+        {names.map((c) => <option key={c} value={c}>{c}</option>)}
+        <option value="__other">Autre… (écrire une nouvelle)</option>
+      </select>
+      {isOther && <input aria-label="Nouvelle catégorie" placeholder="Nom de la nouvelle catégorie" value={value} maxLength={40} onChange={(e) => onChange(e.target.value)} />}
+    </Field>
+  );
 }

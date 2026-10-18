@@ -188,3 +188,15 @@ Barre de menus en haut (Accueil, Vente, Cuisine et stock, Catalogue, Clients et 
 Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces comptées dans le tiroir » ; à la clôture par le gérant, « Total des espèces comptées dans le tiroir (fond de caisse compris) ».
 - **v1.5.1 : saisie des quantités de stock** : l'unité proposée par défaut est celle dans laquelle le stock s'affiche (kg, l, pièces…) et non plus la plus petite (mg, ml) : « 2,5 » tapé à la réception de farine donnait 2,5 mg au lieu de 2,5 kg. Même correction pour Perte, Inventaire, réception fournisseur et seuil « stock bas » d'un nouvel ingrédient.
 - **v1.5.2 : saisie dans les fenêtres (formulaires)** : le curseur revenait sur le premier champ quelques secondes après l'ouverture (à chaque rafraîchissement automatique de la page), ce qui empêchait de passer d'une cellule à l'autre (ex. nom de la recette puis catégorie). Le curseur n'est maintenant placé qu'une seule fois, à l'ouverture. Concerne toutes les fenêtres de l'application.
+
+## v1.5.4 (et 1.5.3)
+- Catégories des ingrédients et des recettes : menu déroulant (liste de départ + catégories déjà utilisées + « Autre… » pour en créer une).
+- Conditionnement : précision que les niveaux s'emboîtent (un seul nom par niveau, pas deux formats alternatifs).
+- Alerte « stock bas » : toutes les unités utiles (kg et g pour un liquide si la densité est connue, ou le conditionnement comme « brique »). Affichage en kg ou l dès 1000.
+- Catégorie des articles de la caisse : menu déroulant aussi.
+- Nouvelle page **Catalogue › Catégories** (propriétaire et gérant) : ajouter, renommer (toutes les fiches suivent, fusion si le nom existe déjà) et supprimer (refusé tant qu'une fiche l'utilise) les catégories des ingrédients, des recettes et des articles de la caisse. Migration 15. Journalisé.
+- **Version bien visible** : pastille verte « Version x.y.z » en haut de chaque écran et sur l'écran de connexion. Elle devient orange (⚠) si la page affichée n'a pas la même version que le serveur ; un bandeau propose alors « Mettre à jour » (vide le cache et recharge).
+
+## v1.5.5
+- Mise en ligne : la fenêtre affiche dès le début « VERSION À ENVOYER » et le dossier utilisé ; contrôle que GitHub contient bien cette version ; si GitHub refuse l'envoi (fichiers ajoutés à la main), le dépôt est remplacé par le contenu du dossier.
+- Le zip ne contient plus de dossier « boutique » englobant : on l'extrait directement dans C:\boutique.

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBox, Notice, PinPad, useAsync } from '../ui.jsx';
+import { VersionBadge } from '../version.jsx';
 
 export default function Login({ pub, message, onDone }) {
   const [users, setUsers] = useState(null);
@@ -33,6 +34,7 @@ export default function Login({ pub, message, onDone }) {
         <div className="login-head">
           {pub.logo ? <img src={pub.logo} alt="" /> : <span className="logo-fallback big">🍽</span>}
           <h1>{pub.shop_name || 'Boutique'}</h1>
+          <VersionBadge server={pub.version} />
         </div>
         <Notice tone="warn">{message}</Notice>
         <ErrorBox error={error} />
