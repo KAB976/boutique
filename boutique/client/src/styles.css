@@ -207,3 +207,19 @@ tr.current td { background: #fbf3e4; }
 .tab-line { margin: 10px 0; } .tabs-btn { border-style: dashed; }
 @media (max-width: 800px) { .board.cols-3, .board.cols-2 { grid-template-columns: 1fr; } .order-lines { font-size: 1.1rem; } }
 @media print { .banner, .subtabs, .alert-bar { display: none; } }
+
+/* Version : pastille bien visible en haut et sur l'écran de connexion */
+.version-badge { background: #1f6f43; color: #fff; border: 2px solid #14532d; border-radius: 999px; padding: 3px 12px; font: 700 .85rem/1.2 inherit; cursor: pointer; white-space: nowrap; }
+.version-badge.diff { background: #d97706; border-color: #92400e; }
+.version-big { font-size: 1.6rem; font-weight: 800; margin: 0 0 8px; }
+.update-banner { background: #fff3cd; border: 2px solid #d97706; }
+.login-head { flex-wrap: wrap; }
+.login-head .version-badge { margin-top: 6px; }
+
+/* Téléphone : tous les menus et toutes les pages sont visibles, sans avoir à faire glisser la barre */
+@media (max-width: 640px) {
+  .menubar { flex-wrap: wrap; overflow-x: visible; gap: 4px; padding-bottom: 6px; border-bottom: 0; }
+  .menubar button { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-height: 40px; background: #fff; }
+  .menubar button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .ribbon { flex-wrap: wrap; overflow-x: visible; border-top: 1px solid var(--line); border-radius: 12px; }
+}

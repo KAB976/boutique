@@ -113,7 +113,7 @@ export function useCategories(kind) {
 }
 
 /** Menu déroulant de catégorie. « Autre… » permet d'en écrire une nouvelle (elle sera proposée ensuite). La liste se gère dans Catalogue › Catégories. */
-export function CategorySelect({ kind, value, onChange, label = 'Catégorie', hint }) {
+export function CategorySelect({ kind, value, onChange, label = 'Catégorie', hint = 'Pour modifier la liste : Catalogue › Catégories.' }) {
   const { names, loaded } = useCategories(kind);
   const match = names.find((n) => n.toLowerCase() === value.trim().toLowerCase());
   const [other, setOther] = React.useState(false);
