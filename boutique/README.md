@@ -194,3 +194,4 @@ Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces com
 - Conditionnement : précision que les niveaux s'emboîtent (un seul nom par niveau, pas deux formats alternatifs).
 - Alerte « stock bas » : toutes les unités utiles (kg et g pour un liquide si la densité est connue, ou le conditionnement comme « brique »). Affichage en kg ou l dès 1000.
 - Catégorie des articles de la caisse : menu déroulant aussi.
+- Nouvelle page **Catalogue › Catégories** (propriétaire et gérant) : ajouter, renommer (toutes les fiches suivent, fusion si le nom existe déjà) et supprimer (refusé tant qu'une fiche l'utilise) les catégories des ingrédients, des recettes et des articles de la caisse. Migration 15. Journalisé.

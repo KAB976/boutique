@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { DEFAULT_CATEGORIES } from './category-defaults.js';
 
 /**
  * Migrations : chaque entrée n'est appliquée qu'une fois, dans l'ordre.
@@ -809,6 +810,20 @@ BEGIN SELECT RAISE(ABORT, 'Une vérification de caisse ne se supprime pas'); END
 ALTER TABLE sales ADD COLUMN discount_reason TEXT NOT NULL DEFAULT '';
 ALTER TABLE sales ADD COLUMN discount_by_name TEXT NOT NULL DEFAULT '';
 `,
+  },
+  {
+    version: 15,
+    name: 'categories',
+    up(db) {
+      db.exec(`CREATE TABLE categories (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('ingredient','recipe','product')),
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 40)
+);
+CREATE UNIQUE INDEX categories_unique ON categories (kind, lower(name));`);
+      const ins = db.prepare('INSERT OR IGNORE INTO categories (kind, name) VALUES (?, ?)');
+      for (const [kind, names] of Object.entries(DEFAULT_CATEGORIES)) for (const n of names) ins.run(kind, n);
+    },
   },
 ];
 

@@ -93,8 +93,8 @@ function List({ data, measures, reload }) {
           </table>
         </div>
       )}
-      {open && <Detail id={open} can={can} measures={measures} usedCategories={items.map((i) => i.category)} onClose={() => setOpen(null)} onEdit={(d) => { setOpen(null); setEdit(d); }} onChanged={reload} />}
-      {edit && <IngredientForm ing={edit === 'new' ? null : edit} measures={measures} usedCategories={items.map((i) => i.category)} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
+      {open && <Detail id={open} can={can} measures={measures} onClose={() => setOpen(null)} onEdit={(d) => { setOpen(null); setEdit(d); }} onChanged={reload} />}
+      {edit && <IngredientForm ing={edit === 'new' ? null : edit} measures={measures} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
     </section>
   );
 }

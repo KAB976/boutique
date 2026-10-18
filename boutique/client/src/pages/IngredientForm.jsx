@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Modal, Field, ErrorBox, Notice, useAsync, FAMILY_FR, CategorySelect, ING_CATEGORIES } from '../ui.jsx';
+import { Modal, Field, ErrorBox, Notice, useAsync, FAMILY_FR, CategorySelect } from '../ui.jsx';
 
 const BASE_UNIT = { mass: 'g', volume: 'ml', count: 'pièce' };
 const DEFAULT_TH = { mass: 'kg', volume: 'l', count: 'piece' };
@@ -28,7 +28,7 @@ function thresholdShown(ing) {
 const toStr = (x) => (x == null ? '' : String(x).replace('.', ','));
 
 /** Création / modification d'un ingrédient. */
-export default function IngredientForm({ ing, measures, usedCategories = [], onClose, onSaved }) {
+export default function IngredientForm({ ing, measures, onClose, onSaved }) {
   const isNew = !ing;
   const { busy, error, setError, run } = useAsync();
   const [f, setF] = useState(() => ({
@@ -144,7 +144,7 @@ export default function IngredientForm({ ing, measures, usedCategories = [], onC
             <div className="inline"><input inputMode="decimal" value={f.thQty} onChange={(e) => set('thQty', e.target.value)} />
               <select aria-label="Unité du seuil" value={f.thUnit} onChange={(e) => set('thUnit', e.target.value)}>{thresholdUnits(f).map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select></div>
           </Field>
-          <CategorySelect value={f.category} onChange={(v) => set('category', v)} defaults={ING_CATEGORIES} used={usedCategories} />
+          <CategorySelect kind="ingredient" value={f.category} onChange={(v) => set('category', v)} />
           <Field label="Lieu de stockage"><input value={f.storage} onChange={(e) => set('storage', e.target.value)} maxLength={40} /></Field>
         </div>
         <Field label="Notes"><input value={f.notes} onChange={(e) => set('notes', e.target.value)} maxLength={500} /></Field>

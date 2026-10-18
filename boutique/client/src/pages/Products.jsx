@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Modal, Field, ErrorBox, Notice, useAsync, CategorySelect, PRODUCT_CATEGORIES } from '../ui.jsx';
+import { Modal, Field, ErrorBox, Notice, useAsync, CategorySelect } from '../ui.jsx';
 import { eur, eurReal, parseEuros, toEuroInput } from '../money.js';
 
 const KIND_HELP = {
@@ -47,7 +47,7 @@ function ProductForm({ product, lists, settings, onClose, onSaved }) {
       <p className="muted small">{KIND_HELP[f.kind]}</p>
       <div className="grid">
         <Field label="Nom affiché à la caisse"><input value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={60} autoFocus /></Field>
-        <CategorySelect value={f.category} onChange={(v) => set('category', v)} defaults={PRODUCT_CATEGORIES} used={lists.categories} hint="Sert à regrouper les boutons de la caisse et les promotions." />
+        <CategorySelect kind="product" value={f.category} onChange={(v) => set('category', v)} hint="Sert à regrouper les boutons de la caisse et les promotions." />
         <Field label="Prix de vente TTC (€)"><input inputMode="decimal" value={f.price} onChange={(e) => set('price', e.target.value)} placeholder="0,00" /></Field>
         <Field label="TVA (%)" hint="0 si vous n'êtes pas assujetti."><input inputMode="decimal" value={f.vat_pct} onChange={(e) => set('vat_pct', e.target.value)} /></Field>
       </div>

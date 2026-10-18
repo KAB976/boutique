@@ -5,6 +5,7 @@ import Setup from './pages/Setup.jsx';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Settings from './pages/Settings.jsx';
+import Categories from './pages/Categories.jsx';
 import Stock from './pages/Stock.jsx';
 import Recipes from './pages/Recipes.jsx';
 import Users from './pages/Users.jsx';
@@ -38,6 +39,7 @@ const TABS = [
   { id: 'recipes', label: 'Recettes', perm: 'recipes.view', Page: Recipes },
   { id: 'stock', label: 'Stock', perm: 'stock.view', Page: Stock },
   { id: 'products', label: 'Articles', perm: 'products.edit', Page: Products },
+  { id: 'categories', label: 'Catégories', perm: 'categories.edit', Page: Categories },
   { id: 'catering', label: 'Traiteur', perm: 'catering.view', Page: Catering },
   { id: 'customers', label: 'Clients', perm: 'customers.view', Page: Customers },
   { id: 'suppliers', label: 'Fournisseurs', perm: 'purchasing.manage', Page: Suppliers },
@@ -55,7 +57,7 @@ const GROUPS = [
   { id: 'g-home', label: 'Accueil', tabs: ['home'] },
   { id: 'g-sell', label: 'Vente', tabs: ['pos', 'orders', 'sales', 'cashcheck'] },
   { id: 'g-kitchen', label: 'Cuisine et stock', tabs: ['kitchen', 'recipes', 'stock'] },
-  { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'promotions'] },
+  { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'categories', 'promotions'] },
   { id: 'g-people', label: 'Clients et achats', tabs: ['customers', 'catering', 'suppliers'] },
   { id: 'g-mgmt', label: 'Gestion', tabs: ['management'] },
   { id: 'g-admin', label: 'Administration', tabs: ['settings', 'users', 'audit', 'backups'] },

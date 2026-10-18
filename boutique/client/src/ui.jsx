@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { api } from './api.js';
 
 export function Modal({ title, onClose, children, wide }) {
   const ref = useRef(null);
@@ -100,22 +101,31 @@ export function defaultStockUnit(it, { packs = true } = {}) {
   return pref.find((c) => units.some((u) => u.code === c)) ?? units[0]?.code ?? '';
 }
 
-/** Menu déroulant de catégorie : liste fixe + celles déjà utilisées + « Autre… » pour en créer une. */
-export function CategorySelect({ value, onChange, defaults, used = [], label = 'Catégorie', hint }) {
-  const all = [...new Set([...defaults, ...used.filter(Boolean)])];
-  const known = value === '' || all.includes(value);
-  const [other, setOther] = React.useState(!known);
+/** Catégories d'un type (ingredient | recipe | product), lues sur le serveur. */
+export function useCategories(kind) {
+  const [st, setSt] = React.useState({ names: [], loaded: false });
+  React.useEffect(() => {
+    let ok = true;
+    api.get('/api/categories').then((d) => { if (ok) setSt({ names: (d[kind] ?? []).map((c) => c.name), loaded: true }); }).catch(() => { if (ok) setSt({ names: [], loaded: true }); });
+    return () => { ok = false; };
+  }, [kind]);
+  return st;
+}
+
+/** Menu déroulant de catégorie. « Autre… » permet d'en écrire une nouvelle (elle sera proposée ensuite). La liste se gère dans Catalogue › Catégories. */
+export function CategorySelect({ kind, value, onChange, label = 'Catégorie', hint }) {
+  const { names, loaded } = useCategories(kind);
+  const match = names.find((n) => n.toLowerCase() === value.trim().toLowerCase());
+  const [other, setOther] = React.useState(false);
+  const isOther = other || (loaded && value !== '' && !match);
   return (
     <Field label={label} hint={hint}>
-      <select value={other ? '__other' : value} onChange={(e) => { if (e.target.value === '__other') { setOther(true); onChange(''); } else { setOther(false); onChange(e.target.value); } }}>
+      <select value={isOther ? '__other' : (match ?? '')} onChange={(e) => { if (e.target.value === '__other') { setOther(true); onChange(''); } else { setOther(false); onChange(e.target.value); } }}>
         <option value="">— Choisir —</option>
-        {all.map((c) => <option key={c} value={c}>{c}</option>)}
+        {names.map((c) => <option key={c} value={c}>{c}</option>)}
         <option value="__other">Autre… (écrire une nouvelle)</option>
       </select>
-      {other && <input aria-label="Nouvelle catégorie" placeholder="Nom de la nouvelle catégorie" value={value} maxLength={40} onChange={(e) => onChange(e.target.value)} />}
+      {isOther && <input aria-label="Nouvelle catégorie" placeholder="Nom de la nouvelle catégorie" value={value} maxLength={40} onChange={(e) => onChange(e.target.value)} />}
     </Field>
   );
 }
-export const ING_CATEGORIES = ['Farines et céréales', 'Sucres et édulcorants', 'Produits laitiers', 'Œufs', 'Viandes', 'Poissons et fruits de mer', 'Fruits', 'Légumes', 'Huiles et matières grasses', 'Épices et condiments', 'Boissons', 'Conserves', 'Emballages', 'Autre'];
-export const RECIPE_CATEGORIES = ['Petit déjeuner', 'Entrée', 'Plat', 'Accompagnement', 'Dessert', 'Pâtisserie', 'Boisson', 'Sauce', 'Snack'];
-export const PRODUCT_CATEGORIES = ['Petit déjeuner', 'Plats', 'Desserts', 'Pâtisseries', 'Boissons chaudes', 'Boissons fraîches', 'Snacks', 'Autre'];
