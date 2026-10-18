@@ -1,0 +1,19 @@
+# Déploiement Render (gratuit). Les deux clés Supabase se saisissent dans l'interface Render, jamais dans ce fichier.
+services:
+  - type: web
+    name: boutique
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/public
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false

@@ -1,0 +1,33 @@
+BOUTIQUE - MODE D'EMPLOI
+========================
+
+POUR TRAVAILLER SUR TABLETTE ET TELEPHONE : voir METTRE-EN-LIGNE.txt (recommande).
+Ce qui suit sert seulement a utiliser Boutique sur ce PC.
+
+PREMIERE INSTALLATION (une seule fois)
+  1. Installez Node.js (version LTS) depuis https://nodejs.org si ce n'est pas deja fait.
+  2. Dans ce dossier, double-cliquez sur  1-INSTALLER.bat
+     (il installe tout, met une icone "Boutique" sur le Bureau et ouvre l'application).
+
+TOUS LES JOURS
+  Double-cliquez sur l'icone "Boutique" du Bureau. La page s'ouvre.
+  (Si vous avez choisi le demarrage avec Windows, il n'y a meme rien a lancer :
+   ouvrez simplement http://localhost:3000 dans le navigateur.)
+  Il n'y a pas de fenetre noire a garder ouverte.
+
+SAUVEGARDES
+  Elles se font toutes seules chaque jour (dossier "data", sous-dossier "sauvegardes").
+  Une fois par semaine, allez dans l'onglet "Sauvegardes", cliquez sur "Telecharger"
+  et gardez le fichier sur une cle USB ou dans le cloud (protege si l'ordinateur tombe en panne).
+
+MISE A JOUR (nouvelle livraison)
+  1. Dezippez la nouvelle livraison et copiez son contenu PAR-DESSUS ce dossier
+     (acceptez de remplacer les fichiers ; le dossier "data" n'est jamais touche).
+  2. Double-cliquez sur  1-INSTALLER.bat  une nouvelle fois.
+  Vos donnees sont conservees.
+
+ARRETER L'APPLICATION
+  Double-cliquez sur  Arreter.bat  (utile avant de copier une mise a jour).
+
+EN CAS DE PROBLEME
+  Ouvrez le fichier  data\serveur.log  et envoyez-moi ses dernieres lignes.
