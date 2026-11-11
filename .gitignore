@@ -3,3 +3,4 @@ data/
 *.log
 .mise-en-ligne.json
 ADRESSE-BOUTIQUE.txt
+.jeton-github.txt

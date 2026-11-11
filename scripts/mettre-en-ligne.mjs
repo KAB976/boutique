@@ -45,18 +45,28 @@ async function main() {
   // ---------- GitHub ----------
   title('1/3  GitHub');
   if (spawnSync('gh', ['auth', 'status'], { shell: process.platform === 'win32', stdio: 'ignore' }).status !== 0) {
-    say('Connexion à GitHub : collez ici votre jeton GitHub (il commence par ghp_), puis Entrée.');
-    say('  Pas de jeton ? Ouvrez https://github.com/settings/tokens/new  → Note : boutique → cochez seulement « repo » → Generate token → copiez-le.');
-    say('  (Faites un clic droit dans cette fenêtre pour coller. Ne prenez pas de capture d\'écran avec le jeton visible.)');
-    say('  Ou appuyez sur Entrée sans rien écrire pour essayer la connexion par navigateur.\n');
-    const tok = await ask('Jeton GitHub :');
-    if (tok) {
-      process.env.GH_TOKEN = tok;
-      if (spawnSync('gh', ['api', 'user', '--jq', '.login'], { shell: process.platform === 'win32', stdio: 'ignore', env: process.env }).status !== 0) stop('Ce jeton est refusé par GitHub (mal copié, expiré, ou la case « repo » n\'est pas cochée). Relancez et recommencez avec un nouveau jeton.');
-    } else {
-      say('\nConnexion par navigateur : un code va s\'afficher, le navigateur s\'ouvre, collez le code et validez.\n');
-      const r = run('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web']);
-      if (r.status !== 0) stop('La connexion à GitHub a échoué. Relancez MISE-EN-LIGNE.bat.');
+    const TOK_FILE = path.join(root, '.jeton-github.txt');
+    const okTok = (t) => spawnSync('gh', ['api', 'user', '--jq', '.login'], { shell: process.platform === 'win32', stdio: 'ignore', env: { ...process.env, GH_TOKEN: t } }).status === 0;
+    let saved = '';
+    try { saved = fs.readFileSync(TOK_FILE, 'utf8').trim(); } catch { /* pas encore de jeton enregistré */ }
+    if (saved && okTok(saved)) { say('Jeton GitHub enregistré trouvé : connexion automatique.'); process.env.GH_TOKEN = saved; }
+    else {
+      if (saved) say('Le jeton enregistré n\'est plus valable (expiré). Il faut en coller un nouveau.\n');
+      say('Connexion à GitHub : collez ici votre jeton GitHub (il commence par ghp_), puis Entrée.');
+      say('  Pas de jeton ? Ouvrez https://github.com/settings/tokens/new  → Note : boutique → Expiration : 90 jours → cochez seulement « repo » → Generate token → copiez-le.');
+      say('  (Clic droit dans cette fenêtre pour coller. Il sera retenu sur CET ordinateur : vous ne le redemanderez plus avant son expiration.)\n');
+      const tok = await ask('Jeton GitHub :');
+      if (tok) {
+        if (!okTok(tok)) stop('Ce jeton est refusé par GitHub (mal copié, expiré, ou la case « repo » n\'est pas cochée). Relancez et recommencez avec un nouveau jeton.');
+        process.env.GH_TOKEN = tok;
+        // Sécurité : le fichier est ignoré par git, il ne part donc JAMAIS sur GitHub.
+        const ign = spawnSync('git', ['check-ignore', '-q', '.jeton-github.txt'], { shell: process.platform === 'win32' }).status === 0;
+        if (ign) { try { fs.writeFileSync(TOK_FILE, tok + '\n'); say('Jeton retenu sur cet ordinateur (fichier .jeton-github.txt).'); } catch { /* tant pis */ } }
+      } else {
+        say('\nConnexion par navigateur : un code va s\'afficher, le navigateur s\'ouvre, collez le code et validez.\n');
+        const r = run('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web']);
+        if (r.status !== 0) stop('La connexion à GitHub a échoué. Relancez MISE-EN-LIGNE.bat.');
+      }
     }
   }
   run('gh', ['auth', 'setup-git']);

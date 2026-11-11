@@ -9,7 +9,7 @@ const PER = { mass: 'kg', volume: 'l', count: 'pièce' };
 const SCALE = { mass: 1000, volume: 1000, count: 1 };
 const num = (s) => Number(String(s ?? '').replace(',', '.'));
 const unitLabel = (units, code) => units.find(([c]) => c === code)?.[1] ?? code;
-const eur2 = (cents) => `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100)} €`;
+export const eur2 = (cents) => `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100)} €`;
 
 /** Un ingrédient « en forme » pour le calcul partagé (même règles que le serveur). */
 function ingLike(f) {

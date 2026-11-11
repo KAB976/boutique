@@ -209,3 +209,10 @@ Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces com
 
 ## v1.7.1
 - Mise en ligne simplifiée : le jeton GitHub se colle directement dans la fenêtre (plus de « set GH_TOKEN ») ; la connexion par navigateur reste possible (Entrée seul). La clé API Render n'est plus obligatoire pour une mise à jour : Render redéploie tout seul après l'envoi sur GitHub et la fenêtre attend que la nouvelle version soit en ligne.
+
+## v1.7.2
+- Liste Stock › Ingrédients : nouvelle colonne « Prix fournisseurs » (prix le moins cher au kg/l/pièce + nom du fournisseur).
+- Fiche détail d'un ingrédient : tableau « Prix par fournisseur » avec « Moins cher » / « + n % ».
+
+## v1.7.3
+- Mise en ligne : le jeton GitHub est demandé une seule fois puis retenu dans `.jeton-github.txt` (ignoré par git, jamais envoyé sur GitHub). Redemandé seulement s'il a expiré.

@@ -2,11 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { Modal, ErrorBox, Notice, useAsync, money, perUnit, fmtDay } from '../ui.jsx';
 import IngredientForm from './IngredientForm.jsx';
+import { eur2 } from './SupplierPrices.jsx';
 import { Receive, Loss, Inventory, Journal, Alerts, Pending } from './StockOps.jsx';
 
 function Detail({ id, can, measures, onClose, onEdit, onChanged }) {
   const [d, setD] = useState(null);
   const { error, setError, run, busy } = useAsync();
+  const [sp, setSp] = useState(null);
+  useEffect(() => { if (can.prices) api.get(`/api/ingredients/${id}/prices`).then(setSp).catch(() => setSp(null)); }, [id, can.prices]);
   const load = useCallback(() => api.get(`/api/ingredients/${id}`).then(setD).catch((e) => setError(e.message)), [id]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
   const toggle = () => run(async () => { await api.patch(`/api/ingredients/${id}`, { active: !d.active }); await load(); onChanged(); });
@@ -21,6 +24,15 @@ function Detail({ id, can, measures, onClose, onEdit, onChanged }) {
             {can.costs && <div className="tile card"><strong>{money(d.value)}</strong><span>Valeur du stock</span></div>}
             {can.prices && <div className="tile card"><strong>{perUnit(d.last_price, d.family)}</strong><span>Dernier prix d'achat</span></div>}
           </div>
+          {can.prices && (
+            <>
+              <h3>Prix par fournisseur</h3>
+              {!sp || sp.items.length === 0 ? <p className="muted">Aucun prix fournisseur saisi.{can.edit ? ' Cliquez sur « Modifier » pour les ajouter.' : ''}</p> : (
+                <div className="table-wrap"><table className="responsive"><thead><tr><th>Fournisseur</th><th>Prix</th><th>Au {sp.per_label}</th><th /></tr></thead>
+                  <tbody>{sp.items.map((it) => <tr key={it.supplier_id}><td>{it.supplier_name}</td><td>{eur2(it.price_cents)} / {String(it.qty).replace('.', ',')} {it.unit}</td><td><strong>{eur2(it.per_cents)}</strong> / {it.per_label}</td><td>{it.cheapest ? <span className="badge ok">Moins cher</span> : it.over_pct > 0 ? <span className="badge warn">+ {String(it.over_pct).replace('.', ',')} %</span> : null}</td></tr>)}</tbody></table></div>
+              )}
+            </>
+          )}
           <h3>Lots en stock</h3>
           {d.lots.length === 0 ? <p className="muted">Aucun lot.</p> : (
             <div className="table-wrap"><table className="responsive"><thead><tr><th>Reçu le</th><th>Reste</th><th>À consommer avant</th></tr></thead>
@@ -52,6 +64,8 @@ function List({ data, measures, reload }) {
   const [open, setOpen] = useState(null);
   const [edit, setEdit] = useState(null); // null | 'new' | ingrédient
   const [all, setAll] = useState(null);
+  const [cmp, setCmp] = useState({});
+  useEffect(() => { if (can.prices) api.get('/api/prices/compare').then((d) => setCmp(Object.fromEntries(d.items.map((x) => [x.ingredient_id, x])))).catch(() => setCmp({})); }, [can.prices, items, edit]);
   useEffect(() => { if (showArchived) api.get('/api/stock?archived=1').then((d) => setAll(d.items)).catch(() => setAll(null)); }, [showArchived, items]);
   const rows = useMemo(() => (showArchived && all ? all : items).filter((i) => {
     if (q && !i.name.toLowerCase().includes(q.trim().toLowerCase())) return false;
@@ -74,12 +88,13 @@ function List({ data, measures, reload }) {
       {rows.length > 0 && (
         <div className="table-wrap">
           <table className="responsive">
-            <thead><tr><th>Ingrédient</th><th>Stock</th>{can.costs && <th>Valeur</th>}<th>Alertes</th><th /></tr></thead>
+            <thead><tr><th>Ingrédient</th><th>Stock</th>{can.prices && <th>Prix fournisseurs</th>}{can.costs && <th>Valeur</th>}<th>Alertes</th><th /></tr></thead>
             <tbody>
               {rows.map((i) => (
                 <tr key={i.id} className={i.active ? '' : 'off'}>
                   <td><strong>{i.name}</strong>{i.category && <div className="muted">{i.category}</div>}</td>
                   <td>{i.stockText}{i.breakdownText && <div className="muted">{i.breakdownText}</div>}</td>
+                  {can.prices && <td>{cmp[i.id] && cmp[i.id].items.length ? (() => { const x = cmp[i.id]; const b = x.items.find((t) => t.cheapest) || x.items[0]; return <><strong>{eur2(b.per_cents)}</strong> / {x.per_label}<div className="muted">{b.supplier_name}{x.items.length > 1 ? ` (le moins cher sur ${x.items.length})` : ''}</div></>; })() : <span className="muted">{can.edit ? 'à saisir (Modifier)' : '—'}</span>}</td>}
                   {can.costs && <td className="nowrap">{money(i.value)}</td>}
                   <td>
                     {i.empty ? <span className="badge warn">vide</span> : i.low ? <span className="badge warn">stock bas</span> : null}
