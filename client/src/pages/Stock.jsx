@@ -29,7 +29,7 @@ function Detail({ id, can, measures, onClose, onEdit, onChanged }) {
               <h3>Prix par fournisseur</h3>
               {!sp || sp.items.length === 0 ? <p className="muted">Aucun prix fournisseur saisi.{can.edit ? ' Cliquez sur « Modifier » pour les ajouter.' : ''}</p> : (
                 <div className="table-wrap"><table className="responsive"><thead><tr><th>Fournisseur</th><th>Prix</th><th>Au {sp.per_label}</th><th /></tr></thead>
-                  <tbody>{sp.items.map((it) => <tr key={it.supplier_id}><td>{it.supplier_name}</td><td>{eur2(it.price_cents)} / {String(it.qty).replace('.', ',')} {it.unit}</td><td><strong>{eur2(it.per_cents)}</strong> / {it.per_label}</td><td>{it.cheapest ? <span className="badge ok">Moins cher</span> : it.over_pct > 0 ? <span className="badge warn">+ {String(it.over_pct).replace('.', ',')} %</span> : null}</td></tr>)}</tbody></table></div>
+                  <tbody>{sp.items.map((it) => <tr key={it.supplier_id}><td>{it.supplier_name}</td><td>{eur2(it.price_cents)} pour {String(it.qty).replace('.', ',')} {it.unit_label || it.unit}</td><td><strong>{eur2(it.per_cents)}</strong> / {it.per_label}</td><td>{it.cheapest ? <span className="badge ok">Moins cher</span> : it.over_pct > 0 ? <span className="badge warn">+ {String(it.over_pct).replace('.', ',')} %</span> : null}</td></tr>)}</tbody></table></div>
               )}
             </>
           )}
@@ -94,7 +94,7 @@ function List({ data, measures, reload }) {
                 <tr key={i.id} className={i.active ? '' : 'off'}>
                   <td><strong>{i.name}</strong>{i.category && <div className="muted">{i.category}</div>}</td>
                   <td>{i.stockText}{i.breakdownText && <div className="muted">{i.breakdownText}</div>}</td>
-                  {can.prices && <td>{cmp[i.id] && cmp[i.id].items.length ? (() => { const x = cmp[i.id]; const b = x.items.find((t) => t.cheapest) || x.items[0]; return <><strong>{eur2(b.per_cents)}</strong> / {x.per_label}<div className="muted">{b.supplier_name}{x.items.length > 1 ? ` (le moins cher sur ${x.items.length})` : ''}</div></>; })() : <span className="muted">{can.edit ? 'à saisir (Modifier)' : '—'}</span>}</td>}
+                  {can.prices && <td>{cmp[i.id] && cmp[i.id].items.length ? cmp[i.id].items.map((t) => <div key={t.supplier_id} className={t.cheapest ? 'ok' : ''}><strong>{eur2(t.price_cents)}</strong> pour {String(t.qty).replace('.', ',')} {t.unit_label || t.unit} <span className="muted">= {eur2(t.per_cents)} / {t.per_label}</span> <span className="muted">· {t.supplier_name}</span>{t.cheapest && cmp[i.id].items.length > 1 && <span className="badge ok">Moins cher</span>}</div>) : <span className="muted">{can.edit ? 'à saisir (Modifier)' : '—'}</span>}</td>}
                   {can.costs && <td className="nowrap">{money(i.value)}</td>}
                   <td>
                     {i.empty ? <span className="badge warn">vide</span> : i.low ? <span className="badge warn">stock bas</span> : null}

@@ -52,3 +52,13 @@ test('prix par fournisseur : comparaison au kg, moins cher repéré, historique,
     assert.ok(w.t.ctx.db.prepare("SELECT 1 FROM audit WHERE action = 'supplier_price.set'").get());
   } finally { await w.t.close(); }
 });
+
+test('le libellé d\'unité lisible est fourni avec chaque prix', async () => {
+  const w = await shop({ shifts: true });
+  try {
+    const sup = await w.ok(w.t.api.post('/api/suppliers', { name: 'Metro' }, w.M), 201);
+    const r = await w.ok(w.t.api.put('/api/ingredients/1/prices', { prices: [{ supplier_id: sup.id ?? sup, price_cents: 160, qty: 200, unit: 'g' }] }, w.M));
+    assert.equal(r.items[0].unit_label, 'g');
+    assert.equal(r.items[0].per_cents, 800); // 1,60 € les 200 g = 8,00 €/kg
+  } finally { await w.t.close(); }
+});

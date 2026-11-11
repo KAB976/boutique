@@ -6,7 +6,7 @@ import { tx } from './db.js';
 import { bad, notFound } from './errors.js';
 import { writeAudit } from './audit.js';
 import { cents, number } from './common.js';
-import { loadIngredient, convertOrThrow, lastPrices } from './stock.js';
+import { loadIngredient, convertOrThrow, lastPrices, loadMeasures, unitLabel } from './stock.js';
 
 const SCALE = { mass: 1000, volume: 1000, count: 1 };
 const PER = { mass: 'kg', volume: 'l', count: 'pièce' };
@@ -22,11 +22,12 @@ export function priceFor(db, supplierId, ingredientId, base) {
 
 function rowsOf(db, ing) {
   const rows = db.prepare(`SELECT p.*, s.name AS supplier_name, s.active AS supplier_active FROM supplier_prices p JOIN suppliers s ON s.id = p.supplier_id WHERE p.ingredient_id = ?`).all(ing.id);
-  const items = rows.map((r) => ({ ...r, per_cents: perDisplayCents(r, ing.family) })).sort((a, b) => a.per_cents - b.per_cents || a.supplier_name.localeCompare(b.supplier_name, 'fr'));
+  const measures = loadMeasures(db, { all: true });
+  const items = rows.map((r) => ({ ...r, unit_label: unitLabel(ing, measures, r.unit), per_cents: perDisplayCents(r, ing.family) })).sort((a, b) => a.per_cents - b.per_cents || a.supplier_name.localeCompare(b.supplier_name, 'fr'));
   const best = items.find((x) => x.supplier_active)?.per_cents ?? null;
   return items.map((x) => ({
     supplier_id: x.supplier_id, supplier_name: x.supplier_name, supplier_active: Boolean(x.supplier_active),
-    price_cents: x.price_cents, qty: x.qty, unit: x.unit, note: x.note, updated_at: x.updated_at, user_name: x.user_name,
+    price_cents: x.price_cents, qty: x.qty, unit: x.unit, unit_label: x.unit_label, note: x.note, updated_at: x.updated_at, user_name: x.user_name,
     per_cents: Math.round(x.per_cents * 100) / 100, per_label: PER[ing.family],
     cheapest: best != null && x.supplier_active === 1 && Math.abs(x.per_cents - best) < 1e-9,
     over_pct: best != null && best > 0 && x.per_cents > best + 1e-9 ? Math.round(((x.per_cents - best) / best) * 1000) / 10 : 0,

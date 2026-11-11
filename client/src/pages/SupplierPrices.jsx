@@ -136,7 +136,7 @@ export default function PriceCompare({ canEdit = true }) {
             {x.items.map((it) => (
               <tr key={it.supplier_id} className={it.supplier_active ? '' : 'off'}>
                 <td><strong>{it.supplier_name}</strong>{!it.supplier_active && <span className="badge">inactif</span>}<div className="muted small">à jour le {fmtD(String(it.updated_at).slice(0, 10))}</div></td>
-                <td>{eur(it.price_cents)} <span className="muted">pour {String(it.qty).replace('.', ',')} {it.unit.startsWith('pack:') ? 'unité(s)' : it.unit === 'piece' ? 'pièce(s)' : it.unit}</span></td>
+                <td>{eur(it.price_cents)} <span className="muted">pour {String(it.qty).replace('.', ',')} {it.unit_label || it.unit}</span></td>
                 <td><strong>{eur2(it.per_cents)}</strong> / {it.per_label}</td>
                 <td>{it.cheapest ? <span className="badge ok">Moins cher</span> : it.over_pct > 0 ? <span className="badge warn">+ {String(it.over_pct).replace('.', ',')} %</span> : null}</td>
               </tr>

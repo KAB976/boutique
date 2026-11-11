@@ -216,3 +216,6 @@ Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces com
 
 ## v1.7.3
 - Mise en ligne : le jeton GitHub est demandé une seule fois puis retenu dans `.jeton-github.txt` (ignoré par git, jamais envoyé sur GitHub). Redemandé seulement s'il a expiré.
+
+## v1.7.4
+- Prix fournisseurs : on affiche le montant exact saisi (« 1,60 € pour 200 g ») avec l'équivalent à côté (« = 8,00 € / kg »), dans la liste des ingrédients, le détail et le comparateur. Unités lisibles (boîte, brique…) au lieu des codes.

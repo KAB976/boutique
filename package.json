@@ -1,6 +1,6 @@
 {
   "name": "boutique",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "type": "module",
   "description": "Gestion snack / traiteur : caisse, stock, recettes, production (PWA)",
