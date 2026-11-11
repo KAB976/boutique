@@ -45,10 +45,19 @@ async function main() {
   // ---------- GitHub ----------
   title('1/3  GitHub');
   if (spawnSync('gh', ['auth', 'status'], { shell: process.platform === 'win32', stdio: 'ignore' }).status !== 0) {
-    say('Connexion à GitHub : un code va s\'afficher, le navigateur s\'ouvre, collez le code et validez.');
-    say('(Pas de compte ? Créez-le gratuitement sur la page qui s\'ouvre, puis revenez ici.)\n');
-    const r = run('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web']);
-    if (r.status !== 0) stop('La connexion à GitHub a échoué. Relancez MISE-EN-LIGNE.bat.');
+    say('Connexion à GitHub : collez ici votre jeton GitHub (il commence par ghp_), puis Entrée.');
+    say('  Pas de jeton ? Ouvrez https://github.com/settings/tokens/new  → Note : boutique → cochez seulement « repo » → Generate token → copiez-le.');
+    say('  (Faites un clic droit dans cette fenêtre pour coller. Ne prenez pas de capture d\'écran avec le jeton visible.)');
+    say('  Ou appuyez sur Entrée sans rien écrire pour essayer la connexion par navigateur.\n');
+    const tok = await ask('Jeton GitHub :');
+    if (tok) {
+      process.env.GH_TOKEN = tok;
+      if (spawnSync('gh', ['api', 'user', '--jq', '.login'], { shell: process.platform === 'win32', stdio: 'ignore', env: process.env }).status !== 0) stop('Ce jeton est refusé par GitHub (mal copié, expiré, ou la case « repo » n\'est pas cochée). Relancez et recommencez avec un nouveau jeton.');
+    } else {
+      say('\nConnexion par navigateur : un code va s\'afficher, le navigateur s\'ouvre, collez le code et validez.\n');
+      const r = run('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web']);
+      if (r.status !== 0) stop('La connexion à GitHub a échoué. Relancez MISE-EN-LIGNE.bat.');
+    }
   }
   run('gh', ['auth', 'setup-git']);
   const user = out('gh', ['api', 'user', '--jq', '.login']);
@@ -89,12 +98,23 @@ async function main() {
   if (fs.existsSync(MARK)) {
     const m = JSON.parse(fs.readFileSync(MARK, 'utf8'));
     title('Mise à jour sur Render');
-    say('Pour lancer la mise à jour, il faut votre clé API Render (Render > votre nom > Account Settings > API Keys).');
-    say('Collez-la ici dans cette fenêtre seulement (clic droit), jamais dans une conversation.\n');
-    const apiKey = await ask('Clé API Render :');
+    say('Render se met à jour tout seul après l\'envoi sur GitHub : la clé API Render n\'est pas nécessaire.');
+    say('Si vous l\'avez, collez-la pour lancer la mise à jour tout de suite ; sinon appuyez sur Entrée.\n');
+    const apiKey = await ask('Clé API Render (facultatif) :');
     try {
-      const r = await redeployRender({ apiKey, serviceId: m.serviceId, expectVersion: VERSION, log: say });
-      say(`\n✓ TERMINÉ. Version ${r.version} en ligne :\n\n    ${r.url}\n`);
+      if (apiKey) {
+        const r = await redeployRender({ apiKey, serviceId: m.serviceId, expectVersion: VERSION, log: say });
+        say(`\n✓ TERMINÉ. Version ${r.version} en ligne :\n\n    ${r.url}\n`);
+      } else {
+        say(`\nJ'attends que ${m.url} passe en version ${VERSION} (3 à 8 minutes, ne fermez pas la fenêtre)…`);
+        const t0 = Date.now(); let seen = null;
+        while (Date.now() - t0 < 12 * 60 * 1000) {
+          await new Promise((ok) => setTimeout(ok, 15000));
+          try { const j = await (await fetch(`${m.url}/api/public`, { signal: AbortSignal.timeout(20000) })).json(); if (j.version !== seen) { seen = j.version; say(`  version actuellement en ligne : ${seen}`); } if (j.version === VERSION) break; } catch { say('  (le serveur redémarre…)'); }
+        }
+        if (seen !== VERSION) stop(`Après 12 minutes, la version en ligne est ${seen ?? 'inconnue'} au lieu de ${VERSION}. Ouvrez https://dashboard.render.com, votre service, onglet Events, et regardez si le déploiement est en erreur. Dites-moi ce que vous voyez.`);
+        say(`\n✓ TERMINÉ. Version ${seen} en ligne :\n\n    ${m.url}\n`);
+      }
       say('Sur le téléphone / la tablette : fermez puis rouvrez l\'application (ou F5 sur PC).');
     } catch (e) { stop(e.message); }
     rl.close(); return;

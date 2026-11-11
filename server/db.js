@@ -825,6 +825,42 @@ CREATE UNIQUE INDEX categories_unique ON categories (kind, lower(name));`);
       for (const [kind, names] of Object.entries(DEFAULT_CATEGORIES)) for (const n of names) ins.run(kind, n);
     },
   },
+  {
+    version: 16,
+    name: 'prix-par-fournisseur',
+    sql: `
+CREATE TABLE supplier_prices (
+  id INTEGER PRIMARY KEY,
+  ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  price_cents INTEGER NOT NULL CHECK (price_cents >= 0),
+  qty REAL NOT NULL CHECK (qty > 0),
+  unit TEXT NOT NULL,
+  base REAL NOT NULL CHECK (base > 0),
+  note TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  user_name TEXT,
+  UNIQUE (ingredient_id, supplier_id)
+);
+CREATE INDEX supplier_prices_i ON supplier_prices (ingredient_id);
+CREATE TABLE supplier_price_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
+  supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+  price_cents INTEGER NOT NULL,
+  qty REAL NOT NULL,
+  unit TEXT NOT NULL,
+  base REAL NOT NULL,
+  user_name TEXT
+);
+CREATE INDEX supplier_price_log_i ON supplier_price_log (ingredient_id, supplier_id, id);
+CREATE TRIGGER supplier_price_log_no_update BEFORE UPDATE ON supplier_price_log
+BEGIN SELECT RAISE(ABORT, 'L''historique des prix est en lecture seule'); END;
+CREATE TRIGGER supplier_price_log_no_delete BEFORE DELETE ON supplier_price_log
+BEGIN SELECT RAISE(ABORT, 'L''historique des prix est en lecture seule'); END;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.at(-1).version;

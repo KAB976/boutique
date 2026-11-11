@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Settings from './pages/Settings.jsx';
 import Categories from './pages/Categories.jsx';
+import Reset from './pages/Reset.jsx';
 import { VersionBadge, UpdateBanner, useServerVersion } from './version.jsx';
 import Stock from './pages/Stock.jsx';
 import Recipes from './pages/Recipes.jsx';
@@ -49,6 +50,7 @@ const TABS = [
   { id: 'settings', label: 'Réglages', perm: 'settings.edit', Page: Settings },
   { id: 'users', label: 'Comptes', perm: 'users.manage', Page: Users },
   { id: 'audit', label: 'Journal', perm: 'audit.view', Page: Audit },
+  { id: 'reset', label: 'Remise à zéro', perm: 'data.reset', Page: Reset },
   { id: 'backups', label: 'Sauvegardes', perm: 'backup.manage', Page: Backups },
   { id: 'account', label: 'Mon compte', perm: null, Page: Account },
 ];
@@ -61,7 +63,7 @@ const GROUPS = [
   { id: 'g-catalog', label: 'Catalogue', tabs: ['products', 'categories', 'promotions'] },
   { id: 'g-people', label: 'Clients et achats', tabs: ['customers', 'catering', 'suppliers'] },
   { id: 'g-mgmt', label: 'Gestion', tabs: ['management'] },
-  { id: 'g-admin', label: 'Administration', tabs: ['settings', 'users', 'audit', 'backups'] },
+  { id: 'g-admin', label: 'Administration', tabs: ['settings', 'users', 'audit', 'backups', 'reset'] },
 ];
 
 const firstTab = (u) => (u.role === 'cashier' ? 'pos' : u.role === 'cook' || u.role === 'waiter' ? 'orders' : 'home');

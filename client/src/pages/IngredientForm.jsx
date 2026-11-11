@@ -1,22 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { Modal, Field, ErrorBox, Notice, useAsync, FAMILY_FR, CategorySelect } from '../ui.jsx';
+import { usableUnits as thresholdUnits, DEFAULT_TH } from '../unitsUi.js';
+import { PricesEditor, validatePriceRows, savePriceRows, rowsFromServer } from './SupplierPrices.jsx';
 
 const BASE_UNIT = { mass: 'g', volume: 'ml', count: 'pièce' };
-const DEFAULT_TH = { mass: 'kg', volume: 'l', count: 'piece' };
-/** Unités proposées pour l'alerte : celles de la famille, + l'autre dimension si la densité est connue, + les conditionnements. */
-function thresholdUnits(f) {
-  const own = { mass: [['g', 'g'], ['kg', 'kg']], volume: [['ml', 'ml'], ['l', 'l']], count: [['piece', 'pièce']] }[f.family];
-  const hasDensity = Number(String(f.density).replace(',', '.')) > 0;
-  const hasPiece = Number(String(f.piece_g).replace(',', '.')) > 0;
-  const out = [...own];
-  if (hasDensity && f.family === 'mass') out.push(['ml', 'ml'], ['l', 'l']);
-  if (hasDensity && f.family === 'volume') out.push(['g', 'g'], ['kg', 'kg']);
-  if (hasPiece && f.family !== 'count') out.push(['piece', 'pièce']);
-  if (hasPiece && f.family === 'count') out.push(['g', 'g'], ['kg', 'kg']);
-  f.packs.forEach((p, i) => { if (p.label.trim()) out.push([`pack:${i}`, p.label.trim()]); });
-  return out;
-}
+
 /** Seuil enregistré (en unité de base) → quantité + unité lisibles (1500 ml → 1,5 l). */
 function thresholdShown(ing) {
   if (ing?.threshold == null) return { qty: '', unit: DEFAULT_TH[ing?.family ?? 'mass'] };
@@ -40,7 +29,14 @@ export default function IngredientForm({ ing, measures, onClose, onSaved }) {
     thQty: thresholdShown(ing).qty, thUnit: thresholdShown(ing).unit, // affiché en kg / l dès que c'est ≥ 1000, pour ne pas confondre g et kg
   }));
   const [tip, setTip] = useState(null);
+  const [priceRows, setPriceRows] = useState(null); // null = pas encore chargé
+  const [pricesOn, setPricesOn] = useState(true);
+  const [saved, setSaved] = useState(null); // ingrédient déjà créé si l'enregistrement des prix a échoué ensuite
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  useEffect(() => { // prix déjà saisis chez les fournisseurs (si on a le droit de les voir)
+    if (isNew) { setPriceRows([]); return; }
+    api.get(`/api/ingredients/${ing.id}/prices`).then((p) => setPriceRows(rowsFromServer(p.items))).catch(() => { setPriceRows([]); setPricesOn(false); });
+  }, []); // eslint-disable-line
   const base = BASE_UNIT[f.family];
 
   useEffect(() => { // changement de famille : l'unité du seuil suit
@@ -73,7 +69,13 @@ export default function IngredientForm({ ing, measures, onClose, onSaved }) {
         equivalences: f.equivs.map((q) => ({ unit: q.unit, base_qty: q.base_qty })),
         threshold: f.thQty === '' ? null : { qty: f.thQty, unit: f.thUnit },
       };
-      const r = isNew ? await api.post('/api/ingredients', body) : await api.patch(`/api/ingredients/${ing.id}`, body);
+      const target = ing ?? saved;
+      if (pricesOn && priceRows) { const msg = validatePriceRows(priceRows, f); if (msg) throw new Error(msg); }
+      const r = target ? await api.patch(`/api/ingredients/${target.id}`, body) : await api.post('/api/ingredients', body);
+      if (!target) setSaved(r);
+      if (pricesOn && priceRows && (priceRows.length > 0 || !isNew)) {
+        try { await savePriceRows(r.id, priceRows); } catch (err) { throw new Error(`L'ingrédient est enregistré, mais pas les prix : ${err.message}. Corrigez puis réenregistrez.`); }
+      }
       onSaved(r);
     });
   };
@@ -116,6 +118,8 @@ export default function IngredientForm({ ing, measures, onClose, onSaved }) {
             </select>
           </Field>
         )}
+
+        {priceRows && pricesOn && <PricesEditor f={f} rows={priceRows} setRows={setPriceRows} available={setPricesOn} />}
 
         <h3>Équivalences en mesures</h3>
         <p className="muted">Pour utiliser des cuillères ou des tasses dans les recettes : combien de {base === 'pièce' ? 'pièces' : base} dans une mesure.</p>

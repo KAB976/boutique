@@ -200,3 +200,12 @@ Libellés clarifiés : à l'ouverture du quart, « Fond de caisse : espèces com
 ## v1.5.5
 - Mise en ligne : la fenêtre affiche dès le début « VERSION À ENVOYER » et le dossier utilisé ; contrôle que GitHub contient bien cette version ; si GitHub refuse l'envoi (fichiers ajoutés à la main), le dépôt est remplacé par le contenu du dossier.
 - Le zip ne contient plus de dossier « boutique » englobant : on l'extrait directement dans C:\boutique.
+
+## v1.6.0
+- **Administration › Remise à zéro** (propriétaire seulement) : fin de la période de test. Efface les ventes, quarts, clôtures, mouvements de caisse, commandes cuisine, soldes clients et tampons de fidélité ; option : dépenses, traiteur. Conserve ingrédients, stock, recettes (et archive), articles, catégories, fournisseurs, promotions, fiches clients, comptes, réglages et journal. Exige la phrase REMETTRE A ZERO + le code PIN ; copie de sécurité automatique avant ; numérotation repartant de 1 ; journalisé.
+
+## v1.7.0
+- **Prix par fournisseur** : dans la fiche d'un ingrédient, section « Prix par fournisseur » (fournisseur, prix, pour quelle quantité) ; le prix au kg / litre / pièce est calculé en direct. Page **Clients et achats › Fournisseurs › Comparer les prix** (du moins cher au plus cher, écart en %, dernier prix payé). Dans un bon de commande : prix connus affichés, alerte si un autre fournisseur est moins cher, prix prévu rempli automatiquement. Historique des prix inscrit dans le journal. Migration 16. Réservé au propriétaire et au gérant.
+
+## v1.7.1
+- Mise en ligne simplifiée : le jeton GitHub se colle directement dans la fenêtre (plus de « set GH_TOKEN ») ; la connexion par navigateur reste possible (Entrée seul). La clé API Render n'est plus obligatoire pour une mise à jour : Render redéploie tout seul après l'envoi sur GitHub et la fenêtre attend que la nouvelle version soit en ligne.

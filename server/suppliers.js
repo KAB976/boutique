@@ -4,6 +4,7 @@ import { bad, notFound, conflict } from './errors.js';
 import { writeAudit } from './audit.js';
 import { cents, text, number, dateStr, nextNumber } from './common.js';
 import { loadIngredient, convertOrThrow, receive } from './stock.js';
+import { priceFor } from './supplier-prices.js';
 
 export const balanceOf = (db, id) => db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS s FROM supplier_ledger WHERE supplier_id = ?').get(id).s; // > 0 : on doit de l'argent
 export const PO_STATUS = { draft: 'Brouillon', sent: 'Envoyé', partial: 'Reçu en partie', received: 'Reçu', cancelled: 'Annulé' };
@@ -36,7 +37,7 @@ export function updateSupplier(db, ts, actor, id, b) {
   });
 }
 
-function cleanLines(db, lines) {
+function cleanLines(db, lines, supplierId = null) {
   if (!Array.isArray(lines) || !lines.length) throw bad('Ajoutez au moins un ingrédient au bon de commande.');
   if (lines.length > 100) throw bad('100 lignes au maximum.');
   const seen = new Set();
@@ -47,7 +48,9 @@ function cleanLines(db, lines) {
     seen.add(ing.id);
     const q = number(l.qty, `Quantité de ${ing.name}`, { min: 0, max: 1e9, exclusiveMin: true });
     const { base } = convertOrThrow(db, ing, q, l.unit);
-    return { ingredient_id: ing.id, qty: q, unit: l.unit, base, expected_total_cents: cents(l.expected_total_cents ?? null, `Prix prévu de ${ing.name}`, { nullable: true }) };
+    let expected = cents(l.expected_total_cents ?? null, `Prix prévu de ${ing.name}`, { nullable: true });
+    if (expected == null && supplierId != null) expected = priceFor(db, supplierId, ing.id, base); // prix connu de ce fournisseur
+    return { ingredient_id: ing.id, qty: q, unit: l.unit, base, expected_total_cents: expected };
   });
 }
 
@@ -55,7 +58,7 @@ export function createPO(db, ts, actor, b) {
   return tx(db, () => {
     const sup = db.prepare('SELECT * FROM suppliers WHERE id = ?').get(b?.supplier_id);
     if (!sup || !sup.active) throw bad('Choisissez le fournisseur.');
-    const lines = cleanLines(db, b.lines);
+    const lines = cleanLines(db, b.lines, sup.id);
     const num = nextNumber(db, 'po', 'BC', { pad: 4 });
     const r = db.prepare('INSERT INTO purchase_orders (number, supplier_id, status, created_at, updated_at, expected_on, note, user_name) VALUES (?,?,?,?,?,?,?,?)')
       .run(num, sup.id, 'draft', ts, ts, dateStr(b.expected_on ?? null, 'Date prévue', { nullable: true }), text(b.note ?? '', 'Note', { max: 300 }), actor?.name ?? null);
@@ -71,7 +74,7 @@ export function updatePO(db, ts, actor, id, b) {
     const po = db.prepare('SELECT * FROM purchase_orders WHERE id = ?').get(id);
     if (!po) throw notFound('Bon de commande introuvable.');
     if (po.status !== 'draft') throw conflict('Seul un brouillon se modifie. Annulez ce bon et créez-en un autre.', 'not_draft');
-    const lines = cleanLines(db, b.lines);
+    const lines = cleanLines(db, b.lines, po.supplier_id);
     db.prepare('DELETE FROM po_lines WHERE po_id = ?').run(id);
     lines.forEach((l, i) => db.prepare('INSERT INTO po_lines (po_id, pos, ingredient_id, qty, unit, base, expected_total_cents) VALUES (?,?,?,?,?,?,?)').run(id, i, l.ingredient_id, l.qty, l.unit, l.base, l.expected_total_cents));
     db.prepare('UPDATE purchase_orders SET updated_at=?, expected_on=?, note=? WHERE id=?').run(ts, dateStr(b.expected_on ?? po.expected_on, 'Date prévue', { nullable: true }), text(b.note ?? po.note, 'Note', { max: 300 }), id);

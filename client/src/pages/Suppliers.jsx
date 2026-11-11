@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import { Modal, Field, ErrorBox, Notice, useAsync, defaultStockUnit } from '../ui.jsx';
+import PriceCompare from './SupplierPrices.jsx';
 import { eur, eurSigned, parseEuros, toEuroInput, fmtDT, fmtD } from '../money.js';
 
 const PAY = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
@@ -87,6 +88,8 @@ function PoForm({ po, suppliers, stock, onClose, onSaved }) {
   const [note, setNote] = useState(po?.note ?? '');
   const [lines, setLines] = useState(po ? po.lines.map((l) => ({ ingredient_id: String(l.ingredient_id), qty: String(l.qty), unit: l.unit, price: toEuroInput(l.expected_total_cents) })) : [empty()]);
   const { busy, error, run } = useAsync();
+  const [cmp, setCmp] = useState({});
+  useEffect(() => { api.get('/api/prices/compare').then((r) => setCmp(Object.fromEntries(r.items.map((x) => [x.ingredient_id, x])))).catch(() => {}); }, []);
   const upd = (i, p) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...p } : l)));
   const items = stock.items.filter((i) => i.active);
   const byId = (id) => items.find((i) => i.id === Number(id));
@@ -113,8 +116,19 @@ function PoForm({ po, suppliers, stock, onClose, onSaved }) {
             <div className="grid">
               <Field label="Ingrédient"><select value={l.ingredient_id} onChange={(e) => { const x = byId(e.target.value); upd(i, { ingredient_id: e.target.value, unit: x ? defaultUnit(x) : '' }); }}><option value="">— choisir —</option>{items.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>
               <Field label="Quantité commandée"><div className="inline"><input inputMode="decimal" value={l.qty} onChange={(e) => upd(i, { qty: e.target.value })} /><select value={l.unit} onChange={(e) => upd(i, { unit: e.target.value })} disabled={!it}>{(it?.units ?? []).map((u) => <option key={u.code} value={u.code}>{u.label}</option>)}</select></div></Field>
-              <Field label="Prix prévu pour la ligne (€, facultatif)"><input inputMode="decimal" value={l.price} onChange={(e) => upd(i, { price: e.target.value })} /></Field>
+              <Field label="Prix prévu pour la ligne (€)" hint="Vide = calculé avec le prix connu de ce fournisseur."><input inputMode="decimal" value={l.price} onChange={(e) => upd(i, { price: e.target.value })} /></Field>
             </div>
+            {cmp[Number(l.ingredient_id)] && (() => {
+              const c = cmp[Number(l.ingredient_id)]; const mine = c.items.find((x) => String(x.supplier_id) === String(supplier)); const best = c.items.find((x) => x.cheapest);
+              const fmt = (x) => `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(x / 100)} €`;
+              return (
+                <p className="small">
+                  <span className="muted">Prix connus : </span>{c.items.map((x) => `${x.supplier_name} ${fmt(x.per_cents)}/${c.per_label}${x.cheapest ? ' (moins cher)' : ''}`).join(' · ')}
+                  {mine && best && !mine.cheapest && <strong className="neg"> — ⚠ {mine.supplier_name} est plus cher que {best.supplier_name} (+ {String(mine.over_pct).replace('.', ',')} %).</strong>}
+                  {supplier && !mine && <span className="muted"> — pas de prix connu chez ce fournisseur.</span>}
+                </p>
+              );
+            })()}
             {lines.length > 1 && <button className="link" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>Retirer cette ligne</button>}
           </div>
         );
@@ -227,9 +241,11 @@ export default function Suppliers() {
     <div>
       <div className="subtabs">
         <button className={sub === 'orders' ? 'active' : ''} onClick={() => setSub('orders')}>Bons de commande</button>
+        <button className={sub === 'prices' ? 'active' : ''} onClick={() => setSub('prices')}>Comparer les prix</button>
         <button className={sub === 'suppliers' ? 'active' : ''} onClick={() => setSub('suppliers')}>Fournisseurs et dettes</button>
       </div>
       <ErrorBox error={error} />
+      {sub === 'prices' && <PriceCompare />}
       {sub === 'orders' && (
         <section className="card">
           <div className="row-between"><h1>Bons de commande</h1><button className="primary" disabled={!suppliers?.length || !stock} onClick={() => setNewPo(true)}>+ Nouveau bon</button></div>

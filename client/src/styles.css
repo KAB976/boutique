@@ -223,3 +223,8 @@ tr.current td { background: #fbf3e4; }
   .menubar button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
   .ribbon { flex-wrap: wrap; overflow-x: visible; border-top: 1px solid var(--line); border-radius: 12px; }
 }
+
+/* Prix par fournisseur */
+.price-row { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,.9fr) auto minmax(0,.8fr) minmax(0,.9fr) minmax(0,1.3fr) 40px; gap: 6px; align-items: center; margin: 6px 0; }
+.price-row strong.ok { color: var(--ok, #1f6f43); }
+@media (max-width: 700px) { .price-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 40px; } .price-row > select:first-child { grid-column: 1 / -1; } .price-row > span { display: none; } .price-row > strong { grid-column: 1 / -1; } }

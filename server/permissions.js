@@ -40,6 +40,7 @@ export const PERMISSIONS = {
   'catalog.view':       ALL,
   'products.edit':      ['owner', 'manager'],
   'categories.edit':    ['owner', 'manager'],
+  'data.reset':         ['owner'],
   'customers.view':     ['owner', 'manager', 'cashier'],
   'customers.edit':     ['owner', 'manager', 'cashier'],
   'customers.credit':   ['owner', 'manager'],
